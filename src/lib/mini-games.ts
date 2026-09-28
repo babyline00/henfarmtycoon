@@ -219,6 +219,34 @@ export function catchSpawnRate(sec: number): number {
 }
 
 /**
+ * Whether a falling item swept from `prevY` to `nextY` passes through the
+ * basket's catch band.
+ *
+ * This exists as a pure function, and is swept rather than point-sampled,
+ * because point sampling is not merely imprecise here — it is wrong at the
+ * frame rates phones actually run at. The band is only
+ * `CATCH_BAND * 2 = 60` logical units tall, while one frame at the top tier
+ * covers `catchFallSpeed * speedMult * dt` = 540 * 2.5 * 0.05 = 67.5 units.
+ * A 20fps frame therefore stepped an item clean over the whole band: it
+ * visibly fell through the basket and scored nothing, and the worse the
+ * frame rate the more often that happened.
+ *
+ * Overlap of the traversed segment [prevY, nextY] with the band
+ * [basketY - band, basketY + band] holds unless the item has not reached the
+ * band yet (nextY above its top) or started past it (prevY below its base).
+ */
+export function catchOverlapsBasket(
+  prevY: number,
+  nextY: number,
+  basketY: number,
+  band: number,
+): boolean {
+  if (!Number.isFinite(prevY) || !Number.isFinite(nextY)) return false
+  if (!Number.isFinite(basketY) || !Number.isFinite(band) || band < 0) return false
+  return nextY >= basketY - band && prevY <= basketY + band
+}
+
+/**
  * Most items that can possibly have fallen in `durationSec`. Integral of
  * the spawn rate, sampled rather than solved so it tracks the ramp exactly
  * — this is the anti-cheat ceiling for catches.
@@ -284,20 +312,25 @@ export function crossMaxRows(durationSec: number): number {
   return Math.floor(durationSec / CROSS_MIN_SEC_PER_ROW_FAST) + ROW_HEADROOM
 }
 
+// Every field is optional on purpose. This is the validator's input, and a
+// hostile client is free to omit anything — so the type has to describe what
+// can actually arrive, not what a well-behaved client sends. It also means a
+// missing field exercises the same `toCount` path a garbage one does,
+// instead of being a case TypeScript quietly ruled out.
 export interface RunTelemetry {
-  distance: number
-  coins: number // pickups claimed
-  eggs: number
-  gems: number
-  boxes: number
+  distance?: number
+  coins?: number // pickups claimed
+  eggs?: number
+  gems?: number
+  boxes?: number
   /** Longest unbroken chain of pickups. Validated, never trusted. */
   combo?: number
 }
 
 export interface CrossTelemetry {
-  score: number // rows reached
-  coins: number
-  powerUps: number
+  score?: number // rows reached
+  coins?: number
+  powerUps?: number
 }
 
 export interface RewardOutcome {
@@ -331,8 +364,26 @@ function toCount(v: number | undefined): number {
   return Math.max(0, Math.floor(v))
 }
 
-function capN(v: number, max: number): number {
+function capN(v: number | undefined, max: number): number {
   return Math.min(toCount(v), Math.max(0, Math.floor(max)))
+}
+
+/**
+ * Whether a claimed score is infinite — a physically impossible claim.
+ *
+ * This is deliberately NOT the same as "unreadable". An honest client cannot
+ * produce an infinite distance or row count: both come from a bounded
+ * simulation, and JSON can carry an infinite number as 1e999, so this is
+ * reachable from the wire and it is unambiguously a cheat.
+ *
+ * NaN is the opposite case — an unreadable field, which is far more likely
+ * to be a broken client than an attack. It is sanitised to zero and simply
+ * earns nothing, because falsely flagging an honest player is the worse
+ * failure. Collapsing the two cases into one `toCount` call would have
+ * quietly downgraded cheat detection on a reachable input.
+ */
+function isImpossible(v: number | undefined): boolean {
+  return v === Infinity || v === -Infinity
 }
 
 export function evaluateRun(
@@ -341,9 +392,15 @@ export function evaluateRun(
   durationSec: number
 ): RewardOutcome {
   const lines: string[] = []
-  const dist = Math.max(0, Math.floor(tel.distance))
+  // toCount, not Math.max(0, Math.floor(...)): Math.max(0, NaN) is NaN, so a
+  // non-finite distance slipped straight through the `dist > maxDist` gate
+  // (NaN > n is false), then poisoned every derived number and paid NaN.
+  const dist = toCount(tel.distance)
 
   // ── anti-cheat validation ──
+  if (isImpossible(tel.distance)) {
+    return { ok: false, cheated: true, reason: 'Distance is not a finite number', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
+  }
   if (durationSec > RUN_MAX_DURATION_SEC) {
     return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
@@ -408,8 +465,11 @@ export function evaluateCross(
   durationSec: number
 ): RewardOutcome {
   const lines: string[] = []
-  const score = Math.max(0, Math.floor(tel.score))
+  const score = toCount(tel.score) // same NaN gate-bypass as evaluateRun
 
+  if (isImpossible(tel.score)) {
+    return { ok: false, cheated: true, reason: 'Row count is not a finite number', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
+  }
   if (durationSec > CROSS_MAX_DURATION_SEC) {
     return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
@@ -453,12 +513,12 @@ export function evaluateCross(
 
 export interface CatchTelemetry {
   /** Eggs scooped into the basket. This is the score. */
-  eggs: number
-  coins: number
-  gems: number
-  boxes: number
-  /** Missed hazards. Informational; does not gate rewards. */
-  missed: number
+  eggs?: number
+  coins?: number
+  gems?: number
+  boxes?: number
+  /** Items that fell past the basket. Informational; does not gate rewards. */
+  missed?: number
 }
 
 /**
@@ -477,10 +537,17 @@ export function evaluateCatch(
   durationSec: number
 ): RewardOutcome {
   const lines: string[] = []
-  const claimed = Math.max(0, Math.floor(tel.eggs) + Math.floor(tel.coins) + Math.floor(tel.gems) + Math.floor(tel.boxes))
+  // Each field goes through toCount individually. Summing raw Math.floor
+  // values meant one NaN made the whole total NaN, and `NaN > allowance` is
+  // false — so a single bad field walked straight through the plausibility
+  // gate that is the only thing bounding this game.
+  const claimed = toCount(tel.eggs) + toCount(tel.coins) + toCount(tel.gems) + toCount(tel.boxes)
 
   if (durationSec > CATCH_MAX_DURATION_SEC) {
     return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
+  }
+  if (isImpossible(tel.eggs) || isImpossible(tel.coins) || isImpossible(tel.gems) || isImpossible(tel.boxes)) {
+    return { ok: false, cheated: true, reason: 'Catch count is not a finite number', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
 
   const allowance = catchMaxItems(durationSec)

@@ -12,7 +12,7 @@ import { play } from '@/lib/sfx'
 // item rate, which the server integrates, is the real one.
 import {
   CATCH_FIELD_W, CATCH_FIELD_H, CATCH_MAX_DURATION_SEC,
-  catchFallSpeed, catchSpawnRate,
+  catchFallSpeed, catchSpawnRate, catchOverlapsBasket,
 } from '@/lib/mini-games'
 
 //══════════ MiniGame 3: Egg Catch ══════════
@@ -134,8 +134,6 @@ export function EggCatch({ tier, tierName, speedMult, winTarget, onEnd, onQuit }
     // ── input ──
     // Pointer sets a target and the basket eases toward it, which is what
     // makes it feel like weight rather than a cursor glued to a sprite.
-    // Pointer sets a target and the basket eases toward it, which is what
-    // makes it feel like weight rather than a cursor glued to a sprite.
     // Horizontal position only: a catcher moves along one axis, and taking
     // the vertical component would make a tap in the top of the field
     // yank the basket to a random column.
@@ -203,12 +201,22 @@ export function EggCatch({ tier, tierName, speedMult, winTarget, onEnd, onQuit }
       while (s.spawnAcc >= 1) { s.spawnAcc -= 1; spawn() }
 
       const fall = catchFallSpeed(s.time) * speedMult
+      const step = fall * dt
       for (const it of s.items) {
-        it.y += fall * dt
         if (it.dead) continue
-        if (it.y < BASKET_Y - CATCH_BAND || it.y > BASKET_Y + CATCH_BAND) continue
+        // ── swept collision ──
+        // Testing only where an item ended up let it jump clean over the
+        // whole catch band in a single frame. The band is only
+        // CATCH_BAND*2 = 60 units wide, but one frame at tier 3 covers
+        // catchFallSpeed * speedMult * dt = 540 * 2.5 * 0.05 = 67.5 units,
+        // so an egg visibly fell through the basket and scored nothing —
+        // and the worse the frame rate, the more often it happened. Testing
+        // the segment the item actually travelled makes a catch identical at
+        // 20fps and 144fps, which is the whole point of the logical field.
+        const prevY = it.y
+        it.y += step
+        if (!catchOverlapsBasket(prevY, it.y, BASKET_Y, CATCH_BAND)) continue
         if (Math.abs(it.x - s.x) > BASKET_W / 2) continue
-        if (Math.abs(it.y - BASKET_Y) > CATCH_BAND) continue
 
         it.dead = true
         if (it.kind === 'rock') {
@@ -226,14 +234,25 @@ export function EggCatch({ tier, tierName, speedMult, winTarget, onEnd, onQuit }
         else if (it.kind === 'gem') { s.gems++; play('reward') }
         else if (it.kind === 'box') { s.boxes++; play('powerup') }
       }
+      // `missed` was declared in the telemetry contract, reported on every
+      // finish, and then never incremented — so the field was a guaranteed
+      // lie. An item that reaches the bottom without being caught is exactly
+      // what it claims to be.
+      const before = s.items.length
       s.items = s.items.filter(it => !it.dead && it.y < CATCH_FIELD_H + ITEM_R)
+      s.missed += before - s.items.length
 
       if (s.eggs >= winTarget) { finish('win'); return }
 
-      setHud({
-        eggs: s.eggs, lives: s.lives,
-        rate: catchSpawnRate(s.time), fall: Math.round(fall),
-      })
+      // Throttled to 8Hz like the other two games. This ran on every single
+      // frame, so a 60Hz display meant 60 React renders a second of the whole
+      // game component to move two numbers.
+      if (Math.floor(s.time * 8) !== Math.floor((s.time - dt) * 8)) {
+        setHud({
+          eggs: s.eggs, lives: s.lives,
+          rate: catchSpawnRate(s.time), fall: Math.round(fall),
+        })
+      }
 
       draw()
     }
