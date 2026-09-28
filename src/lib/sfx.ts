@@ -21,6 +21,8 @@
  * called from anywhere (a route handler, a game loop, a component).
  */
 
+import { voiceSlot, hasRecording, hotSlots, allSlots } from './voice-files'
+
 export type SoundName =
   // base UI / economy cues
   | 'click' | 'collect' | 'hatch' | 'buy' | 'sell' | 'error'
@@ -31,11 +33,13 @@ export type SoundName =
   // game-specific: animals (keys mirror ANIMAL_TYPES + dragon reward)
   // Each species has more than one vocalisation — a cow that can only moo
   // reads as a bleep, so the extra cues are what make it read as livestock.
-  | 'cow' | 'cow_low' | 'sheep' | 'sheep_bleat' | 'duck' | 'duck_whistle'
-  | 'dog' | 'dog_growl' | 'dog_whine' | 'cat' | 'cat_purr'
-  | 'horse' | 'horse_whinny' | 'dragon' | 'dragon_growl'
+  | 'cow' | 'cow_low' | 'cow_moo_barn' | 'cow_moo_many'
+  | 'sheep' | 'sheep_bleat' | 'duck' | 'duck_whistle'
+  | 'dog' | 'dog_growl' | 'dog_whine' | 'cat' | 'cat_purr' | 'cat_meow_cartoon'
+  | 'horse' | 'horse_whinny' | 'horse_snort'
+  | 'dragon' | 'dragon_growl' | 'dragon_roar_echo' | 'dragon_fire'
   // ambience: the farm should sound alive between taps
-  | 'bird' | 'rooster' | 'cricket' | 'wind' | 'water'
+  | 'bird' | 'rooster' | 'rooster_short' | 'cricket' | 'wind' | 'water'
   // game-specific: egg types (keys mirror EGG_TYPES)
   | 'egg_crack' | 'egg_golden' | 'egg_royal' | 'egg_magic' | 'egg_diamond' | 'egg_mystery'
   // game-specific: inventory items (keys mirror ITEM_TYPES)
@@ -200,6 +204,10 @@ function getCtx(): AudioContext | null {
 export function unlockAudio(): void {
   const c = getCtx()
   if (c && c.state === 'suspended') void c.resume().catch(() => { /* ignore */ })
+  // Start fetching the recorded voices now that a real gesture has
+  // happened. Doing this on the first play instead would put a
+  // fetch-and-decode between the tap and the sound.
+  if (c) prefetch(c)
 }
 
 export function setSoundEnabled(on: boolean): void {
@@ -574,6 +582,59 @@ const VOICES: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
     curve: [[0, 0], [0.5, 2], [1, 0]],
     growl: [14, 200], formant: [300, 8], breath: [0.1, 400],
   }),
+  // ── extra calls that have recordings ──
+  // These exist so a farm with two cows does not moo identically twice.
+  // Each has a recording, and a synth voice underneath it, so a missing or
+  // undecodable file degrades to something in-character rather than silence.
+  cow_moo_barn: c => vocal(c, out(c), {
+    dur: 0.7, base: 118, type: 'sawtooth', gain: 0.15,
+    curve: [[0, 0], [0.25, 2], [0.6, -5], [1, -2]],
+    vibrato: [0.4, 4], formant: [660, 4], breath: [0.1, 800],
+  }),
+  cow_moo_many: c => {
+    vocal(c, out(c), { dur: 0.5, base: 128, type: 'sawtooth', gain: 0.13, curve: [[0, 0], [0.5, -3], [1, 0]], formant: [700, 4] })
+    vocal(c, out(c), { dur: 0.45, base: 142, type: 'sawtooth', gain: 0.11, curve: [[0, 0], [0.5, 2], [1, -2]], formant: [760, 4], delay: 0.34 })
+    vocal(c, out(c), { dur: 0.55, base: 112, type: 'sawtooth', gain: 0.1, curve: [[0, 0], [0.6, -4], [1, -1]], formant: [640, 4], delay: 0.72 })
+  },
+  cat_meow_cartoon: c => vocal(c, out(c), {
+    dur: 0.34, base: 700, type: 'square', gain: 0.12,
+    curve: [[0, 0], [0.3, 6], [0.7, 3], [1, -3]],
+    vibrato: [1.4, 18], formant: [1600, 6],
+  }),
+  horse_snort: c => {
+    noise(c, out(c), { dur: 0.22, gain: 0.13, hp: 900 })
+    vocal(c, out(c), {
+      dur: 0.2, base: 240, type: 'sawtooth', gain: 0.12,
+      curve: [[0, 0], [0.4, -4], [1, -7]],
+      breath: [0.14, 1200], delay: 0.04,
+    })
+  },
+  dragon_roar_echo: c => {
+    vocal(c, out(c), {
+      dur: 1.1, base: 76, type: 'sawtooth', gain: 0.17,
+      curve: [[0, 0], [0.2, 4], [0.6, -2], [1, -4]],
+      growl: [16, 170], formant: [400, 7], breath: [0.12, 500],
+    })
+    // a second, quieter pass reads as the echo
+    vocal(c, out(c), {
+      dur: 0.9, base: 72, type: 'sawtooth', gain: 0.09,
+      curve: [[0, 0], [0.7, -3], [1, -5]],
+      growl: [15, 150], formant: [360, 7], delay: 0.32,
+    })
+  },
+  dragon_fire: c => {
+    noise(c, out(c), { dur: 0.7, gain: 0.14, hp: 700 })
+    vocal(c, out(c), {
+      dur: 0.6, base: 120, type: 'sawtooth', gain: 0.13,
+      curve: [[0, 0], [0.3, 3], [1, -6]],
+      growl: [20, 120], formant: [900, 4], breath: [0.16, 1800],
+    })
+  },
+  rooster_short: c => vocal(c, out(c), {
+    dur: 0.3, base: 340, type: 'sawtooth', gain: 0.12,
+    curve: [[0, 0], [0.4, 6], [0.75, 3], [1, -6]],
+    growl: [32, 80], formant: [1100, 4], breath: [0.1, 1500],
+  }),
   // ── ambience ──
   // bird: two rising chirps
   bird: c => {
@@ -641,6 +702,96 @@ function out(c: AudioContext): AudioNode {
   return master ?? c.destination
 }
 
+// ── recorded voices ───────────────────────────────────────────
+// Animal calls are real recordings; everything else is synthesised. See
+// ./voice-files for the map and the reason. This section is the loader:
+// fetch, decode, cache, play, and fall back to the synth voice on any
+// failure. The rule is that audio must never break gameplay and must
+// never leave a cue silent — so a missing file, a decode error or an
+// offline client all end at the same place, the synth voice.
+
+const buffers = new Map<SoundName, AudioBuffer>()
+/** Slots that failed to load; never retried, so a 404 costs one request. */
+const dead = new Set<string>()
+const loading = new Set<string>()
+
+/** Prefetch only matters once audio is actually allowed to run. */
+function fetchAndDecode(name: SoundName, c: AudioContext): void {
+  const slot = voiceSlot(name)
+  if (!slot || dead.has(name) || loading.has(name) || buffers.has(name)) return
+  loading.add(name)
+  void (async () => {
+    try {
+      const res = await fetch(slot.path)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const raw = await res.arrayBuffer()
+      // decodeAudioData detaches the buffer, so hand it a copy we own.
+      const decoded = await c.decodeAudioData(raw.slice(0))
+      buffers.set(name, decoded)
+    } catch {
+      // Offline, 404, or an unsupported codec. Synth covers it from here on.
+      dead.add(name)
+    } finally {
+      loading.delete(name)
+    }
+  })()
+}
+
+/** Warm the hot set now, the rest when the browser is idle. */
+function prefetch(c: AudioContext): void {
+  if (typeof fetch !== 'function') return
+  for (const name of hotSlots()) fetchAndDecode(name as SoundName, c)
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => {
+      for (const name of allSlots()) fetchAndDecode(name as SoundName, c)
+    }, { timeout: 5000 })
+  } else {
+    // No requestIdleCallback (Safari before 17): a timeout is worse but fine.
+    setTimeout(() => {
+      for (const name of allSlots()) fetchAndDecode(name as SoundName, c)
+    }, 1500)
+  }
+}
+
+/** True when a decoded recording is ready to play. */
+export function isVoiceLoaded(name: SoundName): boolean {
+  return buffers.has(name)
+}
+
+/** Diagnostics for the settings screen and for tests. */
+export function voiceStats(): { loaded: number; failed: number; total: number } {
+  return { loaded: buffers.size, failed: dead.size, total: allSlots().length }
+}
+
+/** Play a decoded recording, trimmed to the slot's cap. */
+function playBuffer(c: AudioContext, name: SoundName, buf: AudioBuffer): void {
+  const slot = voiceSlot(name)
+  const dur = Math.min(buf.duration, slot?.maxSec ?? 2)
+  // Start a touch in only if the clip is much longer than the cap, so a
+  // long ambience recording plays from a more interesting point.
+  const offset = buf.duration > dur * 2 ? Math.min(1, (buf.duration - dur) * 0.25) : 0
+
+  const src = c.createBufferSource()
+  src.buffer = buf
+  const g = c.createGain()
+  const peak = slot?.gain ?? 0.8
+  const t0 = c.currentTime
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008)
+  if (buf.duration > dur) {
+    // Truncated: fade rather than cut, or it clicks.
+    const fadeStart = Math.max(0.01, dur - Math.min(0.25, dur * 0.2))
+    g.gain.setValueAtTime(peak, t0 + fadeStart)
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  } else {
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  }
+  src.connect(g)
+  g.connect(out(c))
+  src.start(t0, offset, dur)
+  src.stop(t0 + dur + 0.02)
+}
+
 /** True when a cue has a synth voice. Used by tests to prove the
  *  game-sound maps can never reference a missing voice. */
 export function hasVoice(name: SoundName): boolean {
@@ -658,6 +809,14 @@ export function play(name: SoundName, now = Date.now()): void {
   // all fires at once the moment audio unlocks.
   if (c.state !== 'running') return
   try {
+    const buf = buffers.get(name)
+    if (buf) {
+      playBuffer(c, name, buf)
+      return
+    }
+    // No recording ready. If one exists, start fetching it — and play the
+    // synth voice now rather than a gap, so a tap is never silent.
+    if (hasRecording(name)) fetchAndDecode(name, c)
     VOICES[name](c, out(c))
   } catch {
     /* audio must never break gameplay */

@@ -94,12 +94,12 @@ export function FarmView() {
     <div className="space-y-3 px-3 pb-4">
       {/* ── farm scene banner ── */}
       <div className="relative overflow-hidden rounded-3xl border border-green-200 bg-gradient-to-b from-sky-50 via-lime-50 to-green-100 p-4 shadow-sm">
-        <div className="pointer-events-none absolute right-2 top-2 flex flex-col items-end">
-          <motion.div animate={{ rotate: [0, 8, -8, 0] }}
-            transition={{ repeat: Infinity, duration: 4 }}
+        <div className="pointer-events-none absolute right-30 top-2 flex flex-col items-end">
+          <motion.div animate={{ rotate: [0, 8, -1, 0] }}
+            transition={{ repeat: Infinity, duration: 2 }}
             className="text-4xl"
           >
-            
+            <span aria-hidden="true">{farm.weather.emoji}</span>
           </motion.div>
           <span className={cn(
             'mt-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black',

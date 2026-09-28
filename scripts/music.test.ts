@@ -340,12 +340,30 @@ test('every hen breed still has a voice', () => {
 })
 
 test('soundForAnimalVariant wraps and falls back safely', () => {
-  expect(soundForAnimalVariant('cow', 0)).toBe('cow')
-  expect(soundForAnimalVariant('cow', 1)).toBe('cow_low')
-  expect(soundForAnimalVariant('cow', 2)).toBe('cow')      // wraps
-  expect(soundForAnimalVariant('cow', -1)).toBe('cow_low') // negative wraps
-  expect(soundForAnimalVariant('unicorn', 0)).toBe('collect') // unknown
-  expect(soundForAnimalVariant('cow', NaN)).toBe('cow')
+  // Derived from the list rather than hardcoded, so adding a variant does
+  // not silently invalidate the wrap assertions.
+  const cow = ANIMAL_VARIANTS.cow
+  expect(cow.length).toBeGreaterThan(1)
+  for (let i = 0; i < cow.length; i++) {
+    expect(soundForAnimalVariant('cow', i)).toBe(cow[i])
+  }
+  expect(soundForAnimalVariant('cow', cow.length)).toBe(cow[0])  // wraps forward
+  // A negative index folds to its absolute value and then wraps, so it can
+  // never read off the front of the array. The contract is "always a valid
+  // member", not "negatives count from the end".
+  expect(cow).toContain(soundForAnimalVariant('cow', -1))
+  expect(soundForAnimalVariant('cow', -1000)).toBe(cow[1000 % cow.length])
+  expect(soundForAnimalVariant('unicorn', 0)).toBe('collect')   // unknown species
+  expect(soundForAnimalVariant('cow', NaN)).toBe(cow[0])
+})
+
+test('soundForAnimalVariant always returns a member, for any input', () => {
+  for (const species of Object.keys(ANIMAL_VARIANTS)) {
+    const list = ANIMAL_VARIANTS[species]
+    for (const v of [-99, -1, 0, 1, 7, 1000, 1e9, NaN, 2.7, -2.7]) {
+      expect(list, `${species}@${v}`).toContain(soundForAnimalVariant(species, v))
+    }
+  }
 })
 
 test('dragon has a voice even though it is not a purchasable animal', () => {

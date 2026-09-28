@@ -38,13 +38,13 @@ export const ANIMAL_SOUNDS: Record<string, SoundName> = {
  * cow that only ever says the same word.
  */
 export const ANIMAL_VARIANTS: Record<string, SoundName[]> = {
-  cow: ['cow', 'cow_low'],
+  cow: ['cow', 'cow_low', 'cow_moo_barn', 'cow_moo_many'],
   sheep: ['sheep', 'sheep_bleat'],
   duck: ['duck', 'duck_whistle'],
   dog: ['dog', 'dog_growl', 'dog_whine'],
-  cat: ['cat', 'cat_purr'],
-  horse: ['horse', 'horse_whinny'],
-  dragon: ['dragon', 'dragon_growl'],
+  cat: ['cat', 'cat_purr', 'cat_meow_cartoon'],
+  horse: ['horse', 'horse_whinny', 'horse_snort'],
+  dragon: ['dragon', 'dragon_growl', 'dragon_roar_echo', 'dragon_fire'],
 }
 
 export const DEFAULT_ANIMAL_VARIANTS: SoundName[] = ['collect']

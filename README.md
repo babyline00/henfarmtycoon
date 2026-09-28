@@ -48,58 +48,89 @@ SMOKE_BASE_URL=http://localhost:3022 bun run test:e2e
 
 ## Audio
 
-Everything you hear is **generated at runtime with the Web Audio API**. There
-are no audio files in this repository. That is a deliberate trade: nothing to
-download, no licensing to clear, works offline, and every cue is deterministic.
+Two systems, chosen per cue.
+
+**Animal voices are real recordings. Everything else is synthesised.** That
+split is deliberate. For UI blips, coins and hatching, procedural synthesis is
+the better engineering answer: nothing to download, no licensing to clear,
+works offline, deterministic. But a synthesised "moo" is recognisable as *a
+low vocalisation*, not as a cow, and there is no synthesis trick for that. So
+the species calls are samples.
 
 | Module | Responsibility |
 |---|---|
-| `src/lib/sfx.ts` | 63 sound-effect voices, preferences, throttling |
+| `src/lib/sfx.ts` | Cue playback: recordings when present, synth otherwise |
+| `src/lib/voice-files.ts` | Which cues have a recording, and their playback limits (pure, unit tested) |
 | `src/lib/music.ts` | Generative background music, 7 moods, own bus |
 | `src/lib/ambience.ts` | The soundscape — things that happen on their own |
-| `src/lib/game-sounds.ts` | Game vocabulary → voice (pure, unit tested) |
-| `src/lib/scene-audio.ts` | Screen → music mood, state → soundscape |
+| `src/lib/game-sounds.ts` | Game vocabulary -> voice (pure, unit tested) |
+| `src/lib/scene-audio.ts` | Screen -> music mood, state -> soundscape |
 | `src/components/game/audio-settings.tsx` | The player-facing controls |
+
+**Every recording has a synth voice underneath it.** A missing file, a decode
+error or an offline client falls back to synthesis, so a cue is never silent
+and audio never breaks gameplay. A test enforces that pairing.
+
+**Recordings are trimmed and capped.** Several source clips run for many
+seconds and a button tap must not become a ten-second roar, so every cue
+declares a `maxSec`; anything longer is faded out rather than cut. Recordings
+are also mastered louder than a synth blip, so each carries a per-cue `gain`,
+and the ambience sits deliberately under the animal calls.
+
+**Caching is two-tier.** The hot set — hen, cow, cat, dog, what you hear in
+the first ten seconds — is fetched on the first gesture; the rest arrives on
+`requestIdleCallback`. A cue whose recording is not ready yet plays its synth
+voice immediately rather than a gap, so a tap is never silent.
+
+### Fetching the clips
+
+```bash
+bun run fetch:sounds        # idempotent; skips files already on disk
+```
+
+Sources are Mixkit, under the Mixkit Sound Effects Free License (commercial
+use, no attribution, no redistribution as a standalone collection). The script
+records every file's title, size and source id in
+`public/sounds/animals/CREDITS.md`, and a test fails if a shipped file is
+uncredited or a credited file is missing. It also refuses anything over
+700 KB: the long ambience loops run to 6 MB, which is a brutal download to ask
+a phone for a background texture, so those slots stay synthetic.
 
 **Sound effects and music are on separate buses.** You can silence the
 soundtrack and keep click feedback, or the reverse. Both have their own toggle
-and volume slider, persisted to `localStorage`, reachable from
-**Me → Audio**.
+and volume slider, persisted to `localStorage`, reachable from **Me -> Audio**.
 
 ### Sound effects
 
 Voices are built from four primitives: a shaped oscillator (`tone`), filtered
-noise, a formant-filtered **vocal** (pitch envelope + vibrato + growl + breath),
-and a **trill** (amplitude pulse train) for purring and insects.
-
-Animal calls get real synthesis rather than a single blip — a cow has a slow
-low moo and a deeper bellow, a cat meows *and* purrs, a dog barks, growls and
-whines. A raw oscillator at an animal's pitch does not read as that animal; the
-pitch envelope and the resonant formant are what make it recognisable.
+noise, a formant-filtered **vocal** (pitch envelope + vibrato + growl +
+breath), and a **trill** (amplitude pulse train) for purring and insects.
 
 ### Background music
 
 A lookahead scheduler walks a chord progression and spawns voices on the
-AudioContext clock. `setTimeout`-per-note drifts, and drift is the most audible
-way to make generated music sound cheap.
+AudioContext clock. `setTimeout`-per-note drifts, and drift is the most
+audible way to make generated music sound cheap.
 
-Seven moods, one per screen (farm, night, shop, market, social, arcade, calm),
-each a real progression in a sane register. The music **ducks** under a hatch
-or level-up so the fanfare is not buried, and stops scheduling entirely when
-the tab is hidden.
+Seven moods, one per screen (farm, night, shop, market, social, arcade,
+calm), each a real progression in a sane register. The music **ducks** under a
+hatch or level-up so the fanfare is not buried, and stops scheduling entirely
+when the tab is hidden.
 
 ### Soundscape
 
-On the farm view only, a cue fires every 7–17 s — birdsong and wind by day,
+On the farm view only, a cue fires every 7-17 s — birdsong and wind by day,
 crickets at night, and only the species the player actually owns. A farm with
 no cow never moos.
 
 ### Autoplay policy
 
 Browsers block audio until a real gesture, and iOS Safari keeps the context
-suspended. Audio is therefore created lazily on the first real pointer/key
-event, and any play attempt before that is a silent no-op rather than an
-exception.
+suspended. `unlockAudio()` is wired to the first pointer/key event in
+`page.tsx` — **not** only to login/register/action. That distinction matters:
+unlocking only on those meant a returning player (any page load with an
+existing session) had a suspended SFX context, so `play()` bailed out and the
+first several taps were completely silent.
 
 ## Project layout
 

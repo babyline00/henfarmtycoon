@@ -15,6 +15,7 @@ import { AiAssistant } from '@/components/game/ai-assistant'
 import { AdminPanel } from '@/components/game/admin-panel'
 import { cn } from '@/lib/utils'
 import { setMusicMood, unlockMusic, stopMusic, startMusic } from '@/lib/music'
+import { unlockAudio } from '@/lib/sfx'
 import { startAmbience, stopAmbience } from '@/lib/ambience'
 import { moodForView, ambienceFromState, LOGIN_MOOD } from '@/lib/scene-audio'
 
@@ -53,9 +54,19 @@ export default function Page() {
   }, [view, state?.user.id, state?.hens?.length, state?.animals?.length])
 
   // Autoplay policy: audio may only start from a real gesture.
+  //
+  // unlockAudio() has to be here, not only in the store's login/register/
+  // act calls. Those only run when the player *performs an action*, so on a
+  // page load with an existing session — a reload, or any returning player
+  // — the SFX context was never resumed, `play()` early-returned on a
+  // suspended context, and the first several taps were completely silent.
   useEffect(() => {
     if (!state) return
-    const onGesture = () => { unlockMusic(); startMusic() }
+    const onGesture = () => {
+      unlockAudio()
+      unlockMusic()
+      startMusic()
+    }
     window.addEventListener('pointerdown', onGesture, { once: true })
     window.addEventListener('keydown', onGesture, { once: true })
     return () => {

@@ -8,7 +8,7 @@
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "bun test scripts/auth.test.ts scripts/auth-surface.test.ts scripts/sfx.test.ts scripts/game-sounds.test.ts scripts/music.test.ts",
+    "test": "bun test scripts/auth.test.ts scripts/auth-surface.test.ts scripts/sfx.test.ts scripts/game-sounds.test.ts scripts/music.test.ts scripts/voice-files.test.ts",
     "test:e2e": "node scripts/smoke-test.mjs && node scripts/phase33-smoke-test.mjs && node scripts/wallet-smoke-test.mjs",
     "test:security": "node scripts/security-smoke-test.mjs",
     "test:all": "bun run typecheck && bun run lint && bun run test && bun run test:e2e && bun run test:security",
@@ -16,7 +16,8 @@
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "fetch:sounds": "node scripts/fetch-animal-sounds.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
