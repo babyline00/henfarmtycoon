@@ -94,19 +94,16 @@ export function FarmView() {
     <div className="space-y-3 px-3 pb-4">
       {/* ── farm scene banner ── */}
       <div className="relative overflow-hidden rounded-3xl border border-green-200 bg-gradient-to-b from-sky-50 via-lime-50 to-green-100 p-4 shadow-sm">
-        <div className="pointer-events-none absolute right-30 top-2 flex flex-col items-end">
+        {/* right-35, not right-30: Tailwind v4 emits the spacing scale
+            dynamically, and right-30 was never generated, so this position
+            was silently doing nothing. */}
+        <div className="pointer-events-none absolute right-35 top-1 flex flex-col items-end">
           <motion.div animate={{ rotate: [0, 8, -1, 0] }}
             transition={{ repeat: Infinity, duration: 2 }}
             className="text-4xl"
           >
             <span aria-hidden="true">{farm.weather.emoji}</span>
           </motion.div>
-          <span className={cn(
-            'mt-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black',
-            farm.weather.pct > 0 ? 'bg-green-200 text-green-800' : farm.weather.pct < 0 ? 'bg-red-200 text-red-700' : 'bg-stone-200 text-stone-600',
-          )}>
-            {farm.weather.name} {farm.weather.pct > 0 ? `+${farm.weather.pct}%` : farm.weather.pct !== 0 ? `${farm.weather.pct}%` : ''}
-          </span>
         </div>
         <div className="pointer-events-none absolute bottom-1 right-10 text-3xl" aria-hidden="true">🌳</div>
         <div className="pointer-events-none absolute bottom-0 left-2 text-3xl" aria-hidden="true">🏠</div>
@@ -123,6 +120,12 @@ export function FarmView() {
               <p className="text-xs font-bold text-green-700">⭐ {user.levelName}</p>
             </div>
             <div className="text-right">
+              <span className={cn(
+                'mb-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-black',
+                farm.weather.pct > 0 ? 'bg-green-200 text-green-800' : farm.weather.pct < 0 ? 'bg-red-200 text-red-700' : 'bg-stone-200 text-stone-600',
+              )}>
+                {farm.weather.name} {farm.weather.pct > 0 ? `+${farm.weather.pct}%` : farm.weather.pct !== 0 ? `${farm.weather.pct}%` : ''}
+              </span>
               <p className="text-[10px] font-bold uppercase text-stone-600">Farm value</p>
               <p className="text-lg font-black tabular-nums text-amber-700">🪙 {state.farmValue.toLocaleString()}</p>
             </div>
