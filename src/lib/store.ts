@@ -1,6 +1,8 @@
 'use client'
 
 import { create } from 'zustand'
+import { play, unlockAudio } from './sfx'
+import { soundForAction, soundForHatchResult } from './game-sounds'
 
 // ── types (mirror of server payload) ─────────────────────────
 
@@ -230,6 +232,7 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   login: async (username, password) => {
+    unlockAudio()
     set({ loading: true })
     try {
       const res = await api<{ token: string; isAdmin: boolean }>('/api/auth', {
@@ -239,12 +242,14 @@ export const useGame = create<Store>((set, get) => ({
       setToken(res.token)
       await get().refresh()
       get().showFlash(`Welcome back, farmer! 🌾`)
+      play('reward')
     } finally {
       set({ loading: false })
     }
   },
 
   register: async (username, password, farmName, referralCode) => {
+    unlockAudio()
     set({ loading: true })
     try {
       const res = await api<{ token: string }>('/api/auth', {
@@ -254,6 +259,7 @@ export const useGame = create<Store>((set, get) => ({
       setToken(res.token)
       await get().refresh()
       get().showFlash('Farm created! Happy farming 🐔')
+      play('win')
     } finally {
       set({ loading: false })
     }
@@ -266,6 +272,10 @@ export const useGame = create<Store>((set, get) => ({
   },
 
   act: async (action, payload = {}) => {
+    // Every act() call originates from a tap/click, which is exactly the
+    // user gesture the autoplay policy needs — unlock here, not in the
+    // views, so no call site can forget it.
+    unlockAudio()
     set({ loading: true, pendingAction: action })
     try {
       const res = await api<{ ok?: boolean; message?: string; hatch?: HatchResult } & Record<string, unknown>>(
@@ -275,12 +285,25 @@ export const useGame = create<Store>((set, get) => ({
       await get().refresh()
       if (res.hatch) {
         set({ hatchResult: res.hatch })
-      } else if (res.message) {
-        get().showFlash(res.message)
+        play(soundForHatchResult(res.hatch))
+      } else {
+        if (res.message) {
+          get().showFlash(res.message)
+        }
+        // Payload-aware: buying a cow moos, using medicine hisses.
+        // Unknown future actions resolve to null and stay silent rather
+        // than playing a misleading cue.
+        const cue = soundForAction(action, {
+          itemType: typeof payload.itemType === 'string' ? payload.itemType : undefined,
+          subType: typeof payload.subType === 'string' ? payload.subType : undefined,
+          itemKey: typeof payload.itemKey === 'string' ? payload.itemKey : undefined,
+        })
+        if (cue) play(cue)
       }
       return res
     } catch (e) {
       get().showFlash(e instanceof Error ? e.message : 'Action failed', 'error')
+      play('error')
       return null
     } finally {
       set({ loading: false, pendingAction: null })

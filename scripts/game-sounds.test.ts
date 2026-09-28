@@ -12,7 +12,7 @@ import { hasVoice } from '../src/lib/sfx'
 import {
   HEN_SOUNDS, ANIMAL_SOUNDS, EGG_SOUNDS, ITEM_SOUNDS,
   soundForHen, soundForAnimal, soundForEgg, soundForItem,
-  soundForBuy, soundForAction, soundForHatchReward,
+  soundForBuy, soundForAction, soundForHatchReward, soundForHatchResult,
   soundForMiniGame, soundForSocial, MINI_GAME_SOUNDS,
 } from '../src/lib/game-sounds'
 
@@ -139,4 +139,19 @@ test('rarity ladder: rarer hens get brighter voices', () => {
   expect(soundForHen('golden')).not.toBe(soundForHen('royal'))
   expect(soundForHen('royal')).not.toBe(soundForHen('magic'))
   expect(soundForEgg('normal')).not.toBe(soundForEgg('diamond'))
+})
+
+test('hatch-result payload resolves by emoji: the breed you see is the sound you hear', () => {
+  const chick = (emoji: string, title = 'hatched!') => ({ kind: 'chick', emoji, title })
+  expect(soundForHatchResult(chick('🐔'))).toBe('hen_normal')
+  expect(soundForHatchResult(chick('🐓'))).toBe('hen_golden')
+  expect(soundForHatchResult(chick('🦃'))).toBe('hen_royal')
+  expect(soundForHatchResult(chick('🪿'))).toBe('hen_magic')
+  expect(soundForHatchResult({ kind: 'animal', emoji: '🐄', title: 'joined!' })).toBe('cow')
+  expect(soundForHatchResult({ kind: 'animal', emoji: '🐈', title: 'joined!' })).toBe('cat')
+  expect(soundForHatchResult({ kind: 'coins', emoji: '🪙', title: '+150 Coins!' })).toBe('coin')
+  expect(soundForHatchResult({ kind: 'gems', emoji: '💎', title: '+5 Gems!' })).toBe('coin')
+  // mutation title wins over emoji: rarest moment gets the roar
+  expect(soundForHatchResult({ kind: 'chick', emoji: '🦃', title: '🌟 LEGENDARY MUTATION!' })).toBe('dragon')
+  expect(hasVoice(soundForHatchResult({ kind: 'chick', emoji: '❓', title: '???' }))).toBe(true)
 })

@@ -183,6 +183,41 @@ export function soundForHatchReward(reward: string): SoundName {
   }
 }
 
+// ── hatched-result payload → voice ────────────────────────────
+// The client never sees the reward string — /api/game/action returns a
+// HatchResult { kind, emoji, title, detail }. The emoji carries the breed
+// (it comes straight from HEN_TYPES / ANIMAL_TYPES), the title carries
+// the mutation moment ('🌟 LEGENDARY MUTATION!'). Map those instead of
+// guessing from kind alone, which would make every hatch sound identical.
+const HATCH_EMOJI_SOUNDS: Record<string, SoundName> = {
+  // hens (HEN_TYPES emoji)
+  '🐔': 'hen_normal',
+  '🐓': 'hen_golden',
+  '🦃': 'hen_royal',
+  '🪿': 'hen_magic',
+  // animals (ANIMAL_TYPES emoji)
+  '🐄': 'cow',
+  '🐑': 'sheep',
+  '🦆': 'duck',
+  '🐕': 'dog',
+  '🐈': 'cat',
+  '🐎': 'horse',
+  // currency
+  '🪙': 'coin',
+  '💎': 'coin',
+}
+
+export interface HatchResultLike {
+  kind: string
+  emoji: string
+  title: string
+}
+
+export function soundForHatchResult(hatch: HatchResultLike): SoundName {
+  if (hatch.title.includes('MUTATION')) return 'dragon'
+  return HATCH_EMOJI_SOUNDS[hatch.emoji] ?? 'hatch'
+}
+
 // ── mini-game moments → voice ─────────────────────────────────
 export type MiniGameMoment =
   | 'start' | 'jump' | 'crash' | 'win' | 'lose'
