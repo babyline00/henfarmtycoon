@@ -99,7 +99,7 @@ export function FarmView() {
             transition={{ repeat: Infinity, duration: 4 }}
             className="text-4xl"
           >
-            <span aria-hidden="true">{farm.weather.emoji}</span>
+            
           </motion.div>
           <span className={cn(
             'mt-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-black',

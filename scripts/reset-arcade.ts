@@ -3,7 +3,13 @@
 import { PrismaClient } from '@prisma/client'
 
 const db = new PrismaClient()
-const username = process.argv[2] ?? 'demo'
+// No default: there is no shared demo account any more, and silently
+// editing whichever account happened to match would be a nasty surprise.
+const username = process.argv[2]
+if (!username) {
+  console.error('usage: bun run scripts/reset-arcade.ts <username>')
+  process.exit(1)
+}
 
 const user = await db.user.findUnique({ where: { username } })
 if (!user) { console.error(`user ${username} not found`); process.exit(1) }

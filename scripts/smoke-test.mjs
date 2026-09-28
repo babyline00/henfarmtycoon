@@ -126,33 +126,38 @@ async function main() {
   }
 
   // ── social: friends ──
-  const fa = await api('/api/game/action', { method: 'POST', token, body: { action: 'friend_add', username: 'demo' } })
+  // The counterpart account is registered fresh rather than reusing a
+  // shared demo user, so this suite depends on nothing but itself and
+  // stays repeatable.
+  const otherName = `smokefriend${Date.now().toString().slice(-6)}`
+  const otherReg = await api('/api/auth', {
+    method: 'POST',
+    body: { action: 'register', username: otherName, password: 'test1234', farmName: `Friend ${otherName.slice(-4)}` },
+  })
+  check('Register friend account', otherReg.status === 200 && !!otherReg.data.token, JSON.stringify(otherReg.data).slice(0, 80))
+  const otherToken = otherReg.data.token
+  const otherState = await api('/api/game/state', { token: otherToken })
+  const otherId = otherState.data.user?.id
+
+  const fa = await api('/api/game/action', { method: 'POST', token, body: { action: 'friend_add', username: otherName } })
   check('Friend request sent', fa.status === 200, JSON.stringify(fa.data))
 
-  // demo accepts
-  const demoLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'demo', password: 'demo123' } })
-  check('Demo login works', demoLogin.status === 200)
-  const demoToken = demoLogin.data.token
-  const demoState = await api('/api/game/state', { token: demoToken })
-  const demoId = demoState.data.user?.id
-  const demoSocial = await api('/api/social', { token: demoToken })
-  const reqRow = demoSocial.data.requests?.[0]
-  check('Demo sees pending request', !!reqRow)
+  const otherSocial = await api('/api/social', { token: otherToken })
+  const reqRow = otherSocial.data.requests?.[0]
+  check('Recipient sees pending request', !!reqRow)
   if (reqRow) {
-    const accept = await api('/api/game/action', { method: 'POST', token: demoToken, body: { action: 'friend_accept', requestId: reqRow.rowId } })
+    const accept = await api('/api/game/action', { method: 'POST', token: otherToken, body: { action: 'friend_accept', requestId: reqRow.rowId } })
     check('Friend request accepted', accept.status === 200)
   }
-  const gift = await api('/api/game/action', { method: 'POST', token: demoToken, body: { action: 'gift_friend', friendUserId: uid } })
+  const gift = await api('/api/game/action', { method: 'POST', token: otherToken, body: { action: 'gift_friend', friendUserId: uid } })
   check('Gift sent to friend', gift.status === 200, JSON.stringify(gift.data))
-  // help_friend has a 5/day cap per helper. `demo` is a long-lived shared
-  // account, so asking it to help makes the suite fail on every re-run.
-  // The fresh account registered above is already a friend of demo and has
-  // spent none of its cap, so it is the helper here.
-  const help = await api('/api/game/action', { method: 'POST', token, body: { action: 'help_friend', friendUserId: demoId } })
+  // help_friend has a 5/day cap per helper, so the helper must be an
+  // account that has spent none of it. Both accounts here are fresh.
+  const help = await api('/api/game/action', { method: 'POST', token, body: { action: 'help_friend', friendUserId: otherId } })
   check('Help friend works', help.status === 200, JSON.stringify(help.data))
 
   // visit friend's farm
-  const visit = await api(`/api/social?visit=${uid}`, { token: demoToken })
+  const visit = await api(`/api/social?visit=${uid}`, { token: otherToken })
   check('Farm visit snapshot', visit.status === 200 && visit.data.restricted === false, JSON.stringify(visit.data))
 
   // ── fund account for clan test (mock purchase → gem exchange) ──

@@ -53,56 +53,6 @@ async function main() {
     },
   })
 
-  // ── demo player ──
-  const demo = await db.user.upsert({
-    where: { username: 'demo' },
-    update: {},
-    create: {
-      username: 'demo',
-      email: 'demo@henfarm.io',
-      password: hash('demo123'),
-      farmName: 'Sunny Meadows',
-      avatar: '🧑‍🌾',
-      coins: 1500,
-      gems: 8,
-      xp: 120,
-      referralCode: 'DEMO2026',
-      farm: { create: { lastFedAt: new Date() } },
-    },
-  })
-
-  // demo assets
-  const demoHenCount = await db.hen.count({ where: { userId: demo.id } })
-  if (demoHenCount === 0) {
-    await db.hen.createMany({
-      data: [
-        { userId: demo.id, type: 'normal', name: 'Clucky', bornAt: new Date(Date.now() - 5 * 86400000), lastCollectedAt: new Date(Date.now() - 3 * 3600000) },
-        { userId: demo.id, type: 'normal', name: 'Pip', bornAt: new Date(Date.now() - 4 * 86400000), lastCollectedAt: new Date(Date.now() - 5 * 3600000) },
-        { userId: demo.id, type: 'normal', name: 'Nugget', bornAt: new Date(Date.now() - 3 * 86400000), lastCollectedAt: new Date(Date.now() - 2 * 3600000) },
-        { userId: demo.id, type: 'golden', name: 'Ginger', bornAt: new Date(Date.now() - 2 * 86400000), lastCollectedAt: new Date(Date.now() - 4 * 3600000) },
-      ],
-    })
-    await db.animal.create({ data: { userId: demo.id, type: 'dog', name: 'Rex', bornAt: new Date(Date.now() - 10 * 86400000) } })
-    await db.animal.create({ data: { userId: demo.id, type: 'duck', name: 'Quackers', bornAt: new Date(Date.now() - 8 * 86400000), lastCollectedAt: new Date(Date.now() - 6 * 3600000) } })
-    await db.egg.createMany({
-      data: [
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'normal' },
-        { userId: demo.id, type: 'mystery' },
-      ],
-    })
-    await db.transaction.createMany({
-      data: [
-        { userId: demo.id, type: 'admin', amount: 1000, currency: 'coins', description: 'Welcome bonus' },
-        { userId: demo.id, type: 'buy', amount: -600, currency: 'coins', description: 'Bought 3 Normal Hens' },
-        { userId: demo.id, type: 'buy', amount: -800, currency: 'coins', description: 'Bought Golden Hen' },
-      ],
-    })
-  }
 
   // ── NPC users for leaderboard ──
   const npcs = [
@@ -165,19 +115,7 @@ async function main() {
     })
   }
 
-  // ── welcome notification for demo ──
-  const notifCount = await db.notification.count({ where: { userId: demo.id } })
-  if (notifCount === 0) {
-    await db.notification.create({
-      data: {
-        userId: demo.id,
-        title: 'Welcome to Hen Farm! 🐔',
-        body: 'Collect eggs, hatch rare hens and grow your farm empire. Your first mission awaits!',
-      },
-    })
-  }
-
-  // ── demo clan + memberships (Phase 12) ──
+  // ── clans + memberships (Phase 12) ──
   const clanCount = await db.clan.count()
   if (clanCount === 0) {
     const clan = await db.clan.create({
@@ -250,7 +188,10 @@ async function main() {
     })
   }
 
-  // ── Phase 34: wallet — payment methods + demo deposit history ──
+  // ── Phase 34: wallet — payment methods + deposit history ──
+  // Attributed to the admin account so the finance tab has history to show.
+  // There is no shared demo player any more: the login screen used to publish
+  // one-tap credentials, which put a known password on every deployment.
   const depCount = await db.deposit.count()
   if (depCount === 0) {
     const tinyProof =
@@ -258,15 +199,15 @@ async function main() {
     await db.deposit.createMany({
       data: [
         {
-          userId: demo.id, username: demo.username,
-          amountCents: 1000, method: 'jazzcash', senderName: 'Demo Farmer',
+          userId: admin.id, username: admin.username,
+          amountCents: 1000, method: 'jazzcash', senderName: 'Seeded Account',
           reference: 'JC-88372619283', proof: tinyProof,
           coins: 10000, bonusCoins: 1000, status: 'approved',
           processedAt: new Date(), processedBy: 'admin',
         },
         {
-          userId: demo.id, username: demo.username,
-          amountCents: 500, method: 'bank', senderName: 'Demo Farmer',
+          userId: admin.id, username: admin.username,
+          amountCents: 500, method: 'bank', senderName: 'Seeded Account',
           reference: 'BN-55120447712', proof: tinyProof,
           coins: 5000, bonusCoins: 250, status: 'pending',
         },
@@ -274,7 +215,7 @@ async function main() {
     })
     await db.notification.create({
       data: {
-        userId: demo.id, title: '✅ Deposit approved',
+        userId: admin.id, title: '✅ Deposit approved',
         body: 'Your deposit of $10.00 via JAZZCASH was verified. 🪙 11,000 coins have been added to your wallet!',
       },
     }).catch(() => { /* dup ok */ })
@@ -282,8 +223,8 @@ async function main() {
 
   console.log('✅ Seed complete.')
   console.log('   Admin login → username: admin / password: admin123')
-  console.log('   Demo login  → username: demo / password: demo123')
-  console.log(`   Admin id: ${admin.id}, Demo id: ${demo.id}`)
+  console.log('   Players create their own account from the login screen.')
+  console.log(`   Admin id: ${admin.id}`)
 }
 
 main()

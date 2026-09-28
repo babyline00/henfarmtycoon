@@ -14,11 +14,13 @@ bun run dev          # http://localhost:3022
 
 `bun run dev` listens on **3022**. Override with `PORT=3000 bun run dev`.
 
-Demo accounts (also on the login screen as one-tap buttons):
+There is no demo player account. Players sign up from the login screen.
+
+The seed creates exactly one staff account, and it is the only way into the
+admin portal, so change its password immediately on any real deployment:
 
 | User | Password | Role |
 |---|---|---|
-| `demo` | `demo123` | Player |
 | `admin` | `admin123` | Super Admin (full admin panel) |
 
 ## Verifying it
@@ -108,6 +110,69 @@ src/components/     game views (ui/ holds only button/input/label)
 scripts/            test suites and maintenance scripts
 ```
 
+## Auth
+
+**No demo accounts.** The login screen used to offer one-tap credentials for
+`demo`, which put a publicly known password on every reachable deployment.
+Accounts are now created by players, or recovered by an admin. The seed still
+creates `admin`, because it is the only door into the admin portal — change it
+on first deploy.
+
+**Usernames are case-folded.** SQLite compares TEXT case-sensitively, so
+without folding `Demo` and `demo` were two accounts with two passwords and
+anyone could register a near-copy of a real player. Registration and login
+both go through `canonicalUsername()`. `farmName` keeps its original casing.
+
+**Brute-force limiting is two independent buckets**, because either one alone
+is defeatable:
+
+| Bucket | Key | Counts | Stops |
+|---|---|---|---|
+| per-IP | client address | every attempt | one host spraying many usernames |
+| per-account | address + account | **failures only** | one account sprayed from many hosts |
+
+The per-account bucket is the one that matters, and it counts failures only
+on purpose: a bucket that also counted successful logins would lock out a
+player who simply signs in repeatedly, which is a self-inflicted DoS.
+
+`X-Forwarded-For` is **ignored unless `TRUST_PROXY=1`**. It is
+client-controlled unless a proxy that overwrites it is genuinely deployed.
+Trusting it unconditionally meant a fresh header per request bought unlimited
+login attempts and the limit never fired — you can still see that regression
+tested in `scripts/security-smoke-test.mjs`.
+
+**Sessions** are opaque 32-byte tokens, 30 days, in the `Session` table. Three
+ways to end them: logout (one), change-password (all but the current one), and
+admin force-logout (all). Expired rows are swept opportunistically on login.
+
+**Password policy is defined once**, in `lib/auth.ts` as `passwordProblem()`,
+and every door uses it: registration, a player's own change, and an admin
+reset. It used to live only in the register route, so the admin reset accepted
+any 8 characters — the weakest way into an account had the loosest lock.
+
+## Admin portal
+
+Eleven tabs behind the permission matrix, not a single coarse gate:
+
+| Tab | What it does |
+|---|---|
+| Dash | Platform totals, growth, coin flow, top holders |
+| Analytics | DAU/retention, economy health, revenue by SKU, top spenders |
+| Games | Enable/disable, energy cost, season payouts, cheat monitor |
+| Support | Ticket queue, threaded replies, close/reopen |
+| Users | Search, block, role assignment, balance adjust, password reset, force-logout |
+| Payouts | Withdrawal approve / hold / reject |
+| Deposits | Verify or reject deposits against the reference and proof |
+| Economy | Emergency kill switches, per-key config, rules reference |
+| Events | Create, start/stop, delete |
+| Notify | Broadcast to every player |
+| Security | Flagged accounts, rate-limit hits, permission matrix, audit log |
+
+Each admin action is authorised by what it can *do* (`AREA_FOR` in
+`/api/admin/users`), not by which screen it lives on, and every destructive
+action writes an audit-log row. `set_role` is Super Admin only; resetting
+another *staff* account's password is Super Admin only.
+
 ## Notes for contributors
 
 - The game is **server-authoritative**. The client tracks raw telemetry for
@@ -117,5 +182,7 @@ scripts/            test suites and maintenance scripts
   role gets no permissions. Do not add a fallback that grants `*`.
 - Passwords are scrypt with a `timingSafeEqual` comparison. Legacy SHA-256
   rows are verified and transparently upgraded on login.
-- `scripts/reset-arcade.ts demo` tops up arcade energy for the shared demo
-  account if you have drained it.
+- `bun run scripts/reset-arcade.ts <username>` tops up arcade energy and
+  clears anti-cheat flags for one account. It deliberately takes no default.
+- Players can change their own password and revoke every session from
+  **Me -> Security**. An admin can do the same for anyone from the Users tab.

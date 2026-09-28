@@ -34,17 +34,38 @@ function check(name, cond, extra = '') {
   }
 }
 
-async function api(path, { method = 'GET', token, body } = {}) {
+async function api(path, { method = 'GET', token, body, headers = {} } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { 'x-auth-token': token } : {}),
+      ...headers,
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   })
   const data = await res.json().catch(() => ({}))
   return { status: res.status, data }
+}
+
+/**
+ * Wait out a 429 using the server's own retry hint.
+ *
+ * Admin actions are rate limited per admin id, and this suite performs
+ * several of them (promote staff, revoke staff) in a single pass, so
+ * running it twice in quick succession legitimately hits the ceiling. The
+ * limit is working as designed, so the suite waits rather than the limit
+ * being loosened. A fixed 5s guess was not enough; the server says exactly
+ * how long, so use that.
+ */
+async function apiRetry(path, opts, tries = 4) {
+  let out = await api(path, opts)
+  for (let i = 0; out.status === 429 && i < tries; i++) {
+    const hint = Number(/in (\d+)s/.exec(out.data?.error ?? '')?.[1] ?? 5)
+    await new Promise(r => setTimeout(r, (Number.isFinite(hint) ? hint : 5) * 1000 + 500))
+    out = await api(path, opts)
+  }
+  return out
 }
 
 const stamp = () => Date.now().toString().slice(-7)
@@ -65,20 +86,10 @@ async function makeStaff(adminToken, username, role) {
   const list = await api('/api/admin/users?q=' + encodeURIComponent(username), { token: adminToken })
   const row = list.data.users?.find(u => u.username === username)
   if (!row) throw new Error(`could not find ${username} in admin search`)
-  // set_role is rate-limited, and this suite promotes several accounts in a
-  // row. A back-to-back re-run lands inside that window, so wait it out
-  // rather than failing on a limit that is working as designed.
-  let res = await api('/api/admin/users', {
+  const res = await apiRetry('/api/admin/users', {
     method: 'POST', token: adminToken,
     body: { userId: row.id, action: 'set_role', role },
   })
-  for (let tries = 3; res.status === 429 && tries > 0; tries--) {
-    await new Promise(r => setTimeout(r, 5000))
-    res = await api('/api/admin/users', {
-      method: 'POST', token: adminToken,
-      body: { userId: row.id, action: 'set_role', role },
-    })
-  }
   if (res.status !== 200) throw new Error(`set_role ${username}→${role} failed: ${JSON.stringify(res.data)}`)
   return row.id
 }
@@ -267,6 +278,149 @@ async function main() {
   const good = await registerPlayer('pwok')
   check('Registration accepts a strong password', !!good.token)
 
+  // ═══ 4b. one password policy on every door ═══
+  // The admin reset used to accept any 8 characters while registration
+  // demanded two character classes — the weakest door had the loosest lock.
+  console.log('\n  ── One password policy everywhere')
+  const resetV = await registerPlayer('pv')
+  const pvList = await api('/api/admin/users?q=' + encodeURIComponent(resetV.username), { token: A })
+  const pvId = pvList.data.users.find(u => u.username === resetV.username).id
+
+  const weakReset = await api('/api/admin/users', {
+    method: 'POST', token: A, body: { userId: pvId, action: 'reset_password', newPassword: 'aaaaaaaa' },
+  })
+  check('Admin reset rejects a single-class password (same rule as register)', weakReset.status === 400,
+    `status ${weakReset.status} ${JSON.stringify(weakReset.data)}`)
+
+  const okReset = await api('/api/admin/users', {
+    method: 'POST', token: A, body: { userId: pvId, action: 'reset_password', newPassword: 'Recovery123' },
+  })
+  check('Admin reset accepts a strong password', okReset.status === 200, `status ${okReset.status}`)
+
+  // A reset that does not kill the old sessions is not a recovery.
+  const afterReset = await api('/api/game/state', { token: resetV.token })
+  check('Admin reset revokes the target\'s existing sessions', afterReset.status === 401,
+    `status ${afterReset.status}`)
+  const oldPw = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: resetV.username, password: 'Testpass123' },
+  })
+  check('Old password no longer works after an admin reset', oldPw.status === 401, `status ${oldPw.status}`)
+  const newPw = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: resetV.username, password: 'Recovery123' },
+  })
+  check('New password works after an admin reset', newPw.status === 200, `status ${newPw.status}`)
+
+  // ═══ 4c. session revocation ═══
+  console.log('\n  ── Session revocation')
+  const rev = await registerPlayer('rv')
+  const second = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: rev.username, password: 'Testpass123' },
+  })
+  check('Second device gets a session', second.status === 200 && !!second.data.token, `status ${second.status}`)
+  const rvList = await api('/api/admin/users?q=' + encodeURIComponent(rev.username), { token: A })
+  const rvId = rvList.data.users.find(u => u.username === rev.username).id
+
+  const supRevoke = await api('/api/admin/users', {
+    method: 'POST', token: sup.token, body: { userId: rvId, action: 'revoke_sessions' },
+  })
+  check('Support BLOCKED from revoking sessions', supRevoke.status === 403, `status ${supRevoke.status}`)
+
+  const okRevoke = await api('/api/admin/users', {
+    method: 'POST', token: A, body: { userId: rvId, action: 'revoke_sessions' },
+  })
+  check('Super CAN revoke a user\'s sessions', okRevoke.status === 200, `status ${okRevoke.status}`)
+  const deadSession = await api('/api/game/state', { token: second.data.token })
+  check('Revoked token no longer authenticates', deadSession.status === 401, `status ${deadSession.status}`)
+
+  // ═══ 4d. player can change their own password ═══
+  console.log('\n ── Player password change')
+  const chg = await registerPlayer('chg')
+  const noAuth = await api('/api/auth', {
+    method: 'POST', body: { action: 'change_password', currentPassword: 'Testpass123', newPassword: 'Brandnew123' },
+  })
+  check('Password change requires a session', noAuth.status === 401, `status ${noAuth.status}`)
+
+  const wrongCur = await api('/api/auth', {
+    method: 'POST', token: chg.token, body: { action: 'change_password', currentPassword: 'Wrongpass123', newPassword: 'Brandnew123' },
+  })
+  check('Password change rejects a wrong current password', wrongCur.status === 401, `status ${wrongCur.status}`)
+
+  const weakNew = await api('/api/auth', {
+    method: 'POST', token: chg.token, body: { action: 'change_password', currentPassword: 'Testpass123', newPassword: 'aaaaaaaa' },
+  })
+  check('Password change enforces the strength policy', weakNew.status === 400, `status ${weakNew.status}`)
+
+  const samePw = await api('/api/auth', {
+    method: 'POST', token: chg.token, body: { action: 'change_password', currentPassword: 'Testpass123', newPassword: 'Testpass123' },
+  })
+  check('Password change refuses to reuse the current password', samePw.status === 400, `status ${samePw.status}`)
+
+  // a second device must be killed by the change, and the changer survives
+  const chgSecond = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: chg.username, password: 'Testpass123' },
+  })
+  const okChange = await api('/api/auth', {
+    method: 'POST', token: chg.token, body: { action: 'change_password', currentPassword: 'Testpass123', newPassword: 'Brandnew123' },
+  })
+  check('Player CAN change their own password', okChange.status === 200, `status ${okChange.status} ${JSON.stringify(okChange.data)}`)
+  const killedOther = await api('/api/game/state', { token: chgSecond.data.token })
+  check('Changing the password kills other sessions', killedOther.status === 401, `status ${killedOther.status}`)
+  const selfAlive = await api('/api/game/state', { token: chg.token })
+  check('The changing session stays alive', selfAlive.status === 200, `status ${selfAlive.status}`)
+
+  const oldChg = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: chg.username, password: 'Testpass123' },
+  })
+  check('Old password rejected after a self-service change', oldChg.status === 401, `status ${oldChg.status}`)
+
+  const allOut = await api('/api/auth', { method: 'POST', token: chg.token, body: { action: 'logout_all' } })
+  check('Sign out everywhere succeeds', allOut.status === 200, `status ${allOut.status}`)
+  const afterAll = await api('/api/game/state', { token: chg.token })
+  check('Sign out everywhere ends the current session too', afterAll.status === 401, `status ${afterAll.status}`)
+
+  // ═══ 4e. username identity ═══
+  // SQLite compares TEXT case-sensitively, so without folding "Demo" and
+  // "demo" were two accounts with two passwords.
+  console.log('\n  ── Username identity')
+  const mixed = uniq('case').slice(0, 20)
+  const reg1 = await api('/api/auth', {
+    method: 'POST', body: { action: 'register', username: mixed, password: 'Testpass123', farmName: 'A' },
+  })
+  check('Registration stores a case-folded username', reg1.status === 200 && reg1.data.username === mixed.toLowerCase(),
+    `got ${reg1.data?.username} want ${mixed.toLowerCase()}`)
+
+  const dupe = await api('/api/auth', {
+    method: 'POST', body: { action: 'register', username: mixed.toUpperCase(), password: 'Testpass123', farmName: 'B' },
+  })
+  check('A differently-cased duplicate is rejected', dupe.status === 400 && /taken/i.test(dupe.data.error ?? ''),
+    `status ${dupe.status} ${JSON.stringify(dupe.data)}`)
+
+  const upperLogin = await api('/api/auth', {
+    method: 'POST', body: { action: 'login', username: mixed.toUpperCase(), password: 'Testpass123' },
+  })
+  check('Login is case-insensitive for the same identity', upperLogin.status === 200, `status ${upperLogin.status}`)
+
+  // ═══ 4f. login rate limit cannot be spoofed away ═══
+  // X-Forwarded-For used to be trusted unconditionally, so a fresh header
+  // per request gave unlimited login attempts and the brute-force limit
+  // never fired. It is now only read when TRUST_PROXY=1.
+  console.log('\n  ── Login rate limiting vs header spoofing')
+  const spoofTarget = uniq('atk').slice(0, 20)
+  let sawRateLimit = false
+  const codes = []
+  for (let i = 0; i < 12; i++) {
+    const res = await api('/api/auth', {
+      method: 'POST',
+      body: { action: 'login', username: spoofTarget, password: `wrong${i}` },
+      // a fresh forwarded address on every single attempt
+      headers: { 'x-forwarded-for': `203.0.113.${i}` },
+    })
+    codes.push(res.status)
+    if (res.status === 429) { sawRateLimit = true; break }
+  }
+  check('Spoofing X-Forwarded-For does not buy unlimited attempts', sawRateLimit,
+    `codes: ${codes.join(',')}`)
+
   const wrong = await api('/api/auth', {
     method: 'POST', body: { action: 'login', username: good.username, password: 'Wrongpass123' },
   })
@@ -304,7 +458,9 @@ async function main() {
     method: 'POST', body: { action: 'login', username: good.username, password: 'guess429' },
   })
   if (probe.status === 429) {
-    check('Throttled response includes a retry hint', /retry again in \d+/i.test(probe.data.error ?? ''),
+    // The requirement is that a throttled client is told how long to wait,
+    // not that the message uses one exact phrasing.
+    check('Throttled response includes a retry hint', /\b\d+\s*s(ec)?\b/.test(probe.data.error ?? ''),
       `error=${probe.data.error}`)
   }
 
@@ -327,14 +483,21 @@ async function main() {
     `status ${playerPost.status}`)
 
   // ── cleanup: revoke the temporary staff accounts ──
+  // Hygiene, not an assertion. If the set_role ceiling is still in force the
+  // revoke waits it out, and if it cannot, the run is still a pass — these
+  // are throwaway accounts and leaving one promoted is not a security
+  // finding about the product.
+  let revoked = 0
   for (const u of [sup, fin, gm]) {
     const l = await api('/api/admin/users?q=' + encodeURIComponent(u.username), { token: A })
     const row = l.data.users?.find(x => x.username === u.username)
-    if (row) {
-      await api('/api/admin/users', { method: 'POST', token: A, body: { userId: row.id, action: 'set_role', role: 'none' } })
-    }
+    if (!row) continue
+    const res = await apiRetry('/api/admin/users', {
+      method: 'POST', token: A, body: { userId: row.id, action: 'set_role', role: 'none' },
+    }, 2)
+    if (res.status === 200) revoked++
   }
-  console.log('\n  🧹 temporary staff accounts revoked')
+  console.log(`\n  🧹 temporary staff accounts revoked: ${revoked}/3`)
 
   console.log(`\n${'═'.repeat(54)}`)
   console.log(`RESULT: ${passed} passed, ${failed} failed`)

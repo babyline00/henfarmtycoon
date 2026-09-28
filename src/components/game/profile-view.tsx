@@ -5,6 +5,7 @@ import { useGame, api } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { GameCard, EmptyState, SectionTitle, ProgressBar, ErrorState, LoadingSpinner } from './shared'
 import { AudioSettings } from './audio-settings'
+import { SecurityCard } from './security-card'
 import { getMusicMood } from '@/lib/music'
 import { SupportCenter } from './support-center'
 import { WalletView } from './wallet-view'
@@ -325,6 +326,10 @@ export function ProfileView() {
         ))}
       </div>
 
+
+      {/* ── security ── */}
+      <SectionTitle>🔐 Security</SectionTitle>
+      <SecurityCard />
 
       {/* ── audio ── */}
       <SectionTitle>🔊 Audio</SectionTitle>

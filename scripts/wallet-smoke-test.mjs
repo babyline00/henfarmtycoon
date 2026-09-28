@@ -37,11 +37,7 @@ const REF = `SMK-${Date.now()}`
 async function main() {
   console.log('── Wallet System Smoke Test ──')
 
-  // login
-  const demoLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'demo', password: 'demo123' } })
-  ok(demoLogin.status === 200 && demoLogin.data.token, 'demo login')
-  const demo = demoLogin.data.token
-
+  // admin login (the player side uses a dedicated fresh QA account below)
   const adminLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' } })
   ok(adminLogin.status === 200 && adminLogin.data.token, 'admin login')
   const admin = adminLogin.data.token

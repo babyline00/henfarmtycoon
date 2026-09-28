@@ -68,6 +68,22 @@ export function needsRehash(stored: string): boolean {
   return !(stored.startsWith('scrypt$'))
 }
 
+// ── password policy ───────────────────────────────────────────
+// One rule, used by registration, by a player's own password change, and by
+// an admin reset. It lived only in the auth route, so the admin reset
+// accepted any 8 characters while registration demanded two character
+// classes — the weakest door into an account had the loosest lock.
+export const MIN_PASSWORD = 8
+
+export function passwordProblem(pw: string): string | null {
+  if (!pw) return 'A password is required'
+  if (pw.length < MIN_PASSWORD) return `Password must be at least ${MIN_PASSWORD} characters`
+  if (pw.length > 200) return 'Password is too long'
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter(r => r.test(pw)).length
+  if (classes < 2) return 'Password must mix letters, numbers or symbols (e.g. 2 of 3 classes)'
+  return null
+}
+
 export function makeToken(): string {
   return randomBytes(32).toString('hex')
 }
@@ -77,10 +93,33 @@ export function makeReferralCode(username: string): string {
 }
 
 export async function createSession(userId: string): Promise<string> {
+  // Opportunistic cleanup. Expired rows were accumulating without bound
+  // (372 rows, every one of them dead) because nothing ever deleted them,
+  // which slowed the session lookup on every authenticated request and
+  // grew the database for no benefit. 1-in-N so the write is not on the
+  // hot path for every single login.
+  if (Math.random() < 0.05) {
+    try {
+      await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    } catch { /* housekeeping must never block a login */ }
+  }
   const token = makeToken()
   const expiresAt = new Date(Date.now() + 30 * 86400000)
   await db.session.create({ data: { id: token, userId, expiresAt } })
   return token
+}
+
+/**
+ * Delete every session for a user except (optionally) the one making the
+ * request. Used by the player's own password change and by an admin
+ * force-logout, so a compromised token cannot outlive the response to
+ * either.
+ */
+export async function revokeSessions(userId: string, exceptToken?: string): Promise<number> {
+  const res = await db.session.deleteMany({
+    where: { userId, ...(exceptToken ? { NOT: { id: exceptToken } } : {}) },
+  })
+  return res.count
 }
 
 export async function getUserFromRequest(req: Request): Promise<User | null> {

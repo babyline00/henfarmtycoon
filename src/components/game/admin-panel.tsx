@@ -1449,6 +1449,7 @@ function UserRow({ u, busy, onAction, onDone }: { u: AdminUser; busy: boolean; o
   const [open, setOpen] = useState(false)
   const [adjCoins, setAdjCoins] = useState('')
   const [adjGems, setAdjGems] = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [role, setRole] = useState<string>(u.adminRole ?? (u.isAdmin ? 'super' : 'none'))
 
   return (
@@ -1542,6 +1543,46 @@ function UserRow({ u, busy, onAction, onDone }: { u: AdminUser; busy: boolean; o
               className="min-h-9 rounded-full bg-stone-700 px-3 py-1.5 text-[10px] font-black text-white"
             >
               🧊 Freeze farm
+            </button>
+            <button disabled={busy}
+              onClick={() => onAction(u.id, 'revoke_sessions')}
+              aria-label={`Sign ${u.username} out on all devices`}
+              className="min-h-9 rounded-full bg-purple-700 px-3 py-1.5 text-[10px] font-black text-white disabled:opacity-40"
+            >
+              🚪 Sign out everywhere
+            </button>
+          </div>
+
+          {/* Account recovery. The server has supported an admin password
+              reset since Phase 16, but nothing in this panel ever called it,
+              so a locked-out player could only be helped by hand in the
+              database. Revoking every session at the same time is what makes
+              the reset actually take effect. */}
+          <div className="flex items-end gap-1.5">
+            <div className="flex-1">
+              <Label htmlFor={`reset-pw-${u.id}`} className="text-[9px] font-bold text-stone-600">
+                Reset password (signs out every device)
+              </Label>
+              <Input
+                id={`reset-pw-${u.id}`}
+                type="text"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="New password — e.g. 8+ chars, 2 classes"
+                autoComplete="off"
+                className="h-9 rounded-lg bg-stone-50 text-xs"
+              />
+            </div>
+            <button
+              disabled={busy || newPassword.length < 8}
+              onClick={async () => {
+                await onAction(u.id, 'reset_password', { newPassword })
+                setNewPassword('')
+              }}
+              aria-label={`Reset the password for ${u.username}`}
+              className="min-h-9 rounded-lg bg-red-700 px-3 text-[10px] font-black text-white disabled:opacity-40"
+            >
+              🔑 Reset
             </button>
           </div>
           <div className="flex items-end gap-1.5">

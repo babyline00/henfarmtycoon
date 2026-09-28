@@ -72,7 +72,12 @@ const DEFAULT_RULE: RateRule = { limit: 40, windowMs: 60000 }
 // queue is not the same trust decision as a player collecting eggs.
 const ADMIN_RULES: Record<string, RateRule> = {
   adjust: { limit: 30, windowMs: 60000 },
-  reset_password: { limit: 5, windowMs: 60000 },
+  // 10/min rather than 5: this is a takeover primitive, so the real
+  // controls are the permission gate and the audit log, not this ceiling —
+  // and a rate limit does not stop a determined insider anyway. But it
+  // does block legitimate incident response, where an admin recovering
+  // several locked-out players in a row is exactly the intended use.
+  reset_password: { limit: 10, windowMs: 60000 },
   approve: { limit: 40, windowMs: 60000 },
   reject: { limit: 40, windowMs: 60000 },
   hold: { limit: 20, windowMs: 60000 },
@@ -83,6 +88,7 @@ const ADMIN_RULES: Record<string, RateRule> = {
   freeze_farm: { limit: 15, windowMs: 60000 },
   grant_hen: { limit: 30, windowMs: 60000 },
   unflag: { limit: 20, windowMs: 60000 },
+  revoke_sessions: { limit: 10, windowMs: 60000 },
 }
 
 export function checkAdminRate(adminId: string, action: string): RateResult {

@@ -45,11 +45,10 @@ bun run start          # serves on :3000
 ## 4. Default accounts (CHANGE IMMEDIATELY)
 
 - Super Admin: `admin / admin123` → Admin Panel → set a new password & roles
-- Demo player: `demo / demo123`
 
 ## 5. Production checklist
 
-- [ ] Change admin password + rotate any demo accounts
+- [ ] Change the admin password (there is no demo player to rotate)
 - [ ] Serve behind TLS (nginx conf in `deploy/` — add certbot/Let's Encrypt)
 - [ ] Swap the **mock payment gateway** in `src/lib/payment.ts` /
       `purchase_gems` / `purchase_vip` actions for Stripe/Paddle before

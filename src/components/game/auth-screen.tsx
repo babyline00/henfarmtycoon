@@ -27,11 +27,6 @@ export function AuthScreen() {
     }
   }
 
-  function fillDemo(kind: 'player' | 'admin') {
-    setUsername(kind === 'admin' ? 'admin' : 'demo')
-    setPassword(kind === 'admin' ? 'admin123' : 'demo123')
-  }
-
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-sky-50 via-lime-50 to-amber-50 px-5 py-10">
       {/* decorative field */}
@@ -143,25 +138,12 @@ export function AuthScreen() {
             </Button>
           </form>
 
-          {isLogin && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
-              <p className="text-[11px] font-bold text-amber-700">🎮 Demo accounts</p>
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => fillDemo('player')}
-                  aria-label="Fill the form with the demo player credentials"
-                  className="min-h-9 flex-1 rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
-                >
-                  👨‍🌾 Player<br /><span className="font-normal">demo / demo123</span>
-                </button>
-                <button onClick={() => fillDemo('admin')}
-                  aria-label="Fill the form with the Super Admin demo credentials"
-                  className="min-h-9 flex-1 rounded-lg border border-red-200 bg-white px-2 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50"
-                >
-                  🛡️ SuperAdmin<br /><span className="font-normal">admin / admin123</span>
-                </button>
-              </div>
-            </div>
-          )}
+          {/* {isLogin && (
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-[11px] font-bold text-amber-800">
+              🔒 Staff access is for administrators. Players sign in with the
+              account they created when they started their farm.
+            </p>
+          )} */}
         </div>
 
         <p className="mt-4 text-center text-[11px] text-stone-600">

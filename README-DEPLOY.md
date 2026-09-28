@@ -30,13 +30,13 @@ This guide ships the complete farming game platform (player app + Super Admin pa
 # 1. Build & launch the whole stack
 docker compose up -d --build
 
-# 2. Seed demo data (admin/demo accounts, NPC market, clans)
+# 2. Seed content (admin account, NPC market, clans)
 docker compose exec app npx tsx scripts/seed.ts   # or bake into image
 
 # 3. Open
 #    http://SERVER_IP/            → mobile game (PWA-style layout)
 #    Admin login → admin / admin123 (change immediately!)
-#    Demo login  → demo / demo123
+#    Players create their own account from the login screen
 ```
 
 ## Without Docker

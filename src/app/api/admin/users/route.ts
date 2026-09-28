@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
-import { requireAdmin, err, json, hashPassword } from '@/lib/auth'
+import { requireAdmin, err, json, hashPassword, revokeSessions, passwordProblem } from '@/lib/auth'
 import { levelInfo, numericLevel } from '@/lib/game'
-import { can, roleLabel, isSuper, PERM, checkAdminRate } from '@/lib/security'
+import { can, roleLabel, isSuper, PERM, checkAdminRate, logSecurityEvent } from '@/lib/security'
 
 // Admin balance edits are a currency mint/burn. Bounded so a single
 // mis-click cannot inject an unbounded amount into the economy.
@@ -88,6 +88,7 @@ export async function POST(req: Request) {
     adjust: PERM.USERS_BALANCE,
     reset_password: PERM.USERS_PASSWORD,
     freeze_farm: PERM.USERS_BAN,
+    revoke_sessions: PERM.USERS_PASSWORD,
     set_role: '*', // super-only, checked via isSuper
   }
   const area = AREA_FOR[action]
@@ -127,6 +128,22 @@ export async function POST(req: Request) {
     await db.user.update({ where: { id: userId }, data: { flagged: false, flagReason: null } })
     await logAdmin('unflag', `@${user.username} was: ${user.flagReason ?? 'flagged'}`)
     return json({ ok: true, message: `Flag cleared for ${user.username}` })
+  }
+
+  if (action === 'revoke_sessions') {
+    // Force sign-out. The recovery step for a suspected compromise: revoking
+    // the token ends the attacker's access immediately, and it is also what
+    // makes an admin password reset mean anything.
+    if (user.isAdmin && !isSuper(admin.adminRole)) {
+      return err('Only the Super Admin can sign out another staff account', 403)
+    }
+    const revoked = await revokeSessions(userId)
+    await logAdmin('revoke_sessions', `@${user.username} — ${revoked} session(s) revoked`)
+    await logSecurityEvent(userId, 'sessions_revoked', `An administrator (${admin.username}) signed out all of @${user.username}'s sessions`)
+    await db.notification.create({
+      data: { userId, title: '🔐 Signed out everywhere', body: 'An administrator signed you out on all devices. If this was not you, change your password.' },
+    })
+    return json({ ok: true, message: `Signed ${user.username} out of ${revoked} device(s)` })
   }
 
   if (action === 'set_role') {
@@ -201,16 +218,27 @@ export async function POST(req: Request) {
   }
 
   if (action === 'reset_password') {
-    // Super Admin only — this is a full account takeover primitive, so
-    // it is deliberately not exposed in the admin UI. It exists for
-    // manual account recovery, and every use is audited.
+    // A full account-takeover primitive, so it is permission-gated
+    // (USERS_PASSWORD) and cannot be used on another staff account without
+    // being Super Admin. Every session is revoked, which is what makes the
+    // reset actually take effect rather than leaving a stolen token alive,
+    // and the player is told to change it. Each use is audited.
     const newPassword = String(body.newPassword ?? '')
-    if (newPassword.length < 8) return err('New password must be at least 8 characters')
+    const problem = passwordProblem(newPassword)
+    if (problem) return err(problem)
     if (user.isAdmin && !isSuper(admin.adminRole)) return err('Cannot reset another admin account', 403)
     await db.user.update({ where: { id: userId }, data: { password: await hashPassword(newPassword) } })
-    await db.session.deleteMany({ where: { userId } })
-    await logAdmin('reset_password', `@${user.username} (${user.isAdmin ? 'ADMIN ' : ''}all sessions revoked)`)
-    return json({ ok: true, message: `Password reset for ${user.username} — all their sessions were signed out` })
+    const revoked = await revokeSessions(userId)
+    await logAdmin('reset_password', `@${user.username} (${user.isAdmin ? 'ADMIN ' : ''}${revoked} session(s) revoked)`)
+    await logSecurityEvent(userId, 'password_reset', `An administrator (${admin.username}) reset the password`)
+    await db.notification.create({
+      data: {
+        userId,
+        title: '🔐 Your password was reset',
+        body: 'An administrator reset your password and signed you out everywhere. If you did not expect this, contact support immediately.',
+      },
+    })
+    return json({ ok: true, message: `Password reset for ${user.username} — ${revoked} session(s) signed out` })
   }
 
   if (action === 'freeze_farm') {
