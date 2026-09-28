@@ -251,10 +251,22 @@ export function levelIndexForXp(xp: number): number {
   return idx
 }
 
-export function levelInfo(xp: number) {
+// The explicit return type is load-bearing. Without it TypeScript infers
+// `nextXp: number` — indexing an array without noUncheckedIndexedAccess is
+// assumed to always succeed, so `?? null` looked unreachable and the `null`
+// that the top level genuinely returns vanished from the contract. A consumer
+// that trusted the inferred type and did arithmetic on it would produce NaN
+// for exactly the players who max out.
+export function levelInfo(xp: number): {
+  idx: number
+  name: string
+  xp: number
+  nextXp: number | null
+  progressPct: number
+} {
   const idx = levelIndexForXp(xp)
   const cur = FARMER_LEVELS[idx]
-  const next = FARMER_LEVELS[idx + 1] ?? null
+  const next: (typeof FARMER_LEVELS)[number] | null = FARMER_LEVELS[idx + 1] ?? null
   return {
     idx,
     name: cur.name,
@@ -318,15 +330,68 @@ export function productionMultiplier(opts: {
   return m
 }
 
-export function pendingProduction(
-  lastCollectedAt: Date,
-  ratePerHour: number,
-  capHours: number,
-  now: Date = new Date()
-): { amount: number; capped: boolean } {
-  const hours = Math.max(0, (now.getTime() - lastCollectedAt.getTime()) / 3600000)
-  const effHours = Math.min(hours, capHours)
-  return { amount: Math.floor(effHours * ratePerHour), capped: hours > capHours }
+export interface ProductionSettle {
+  /** Whole units to hand the player. */
+  amount: number
+  /** The clock to store back on the producer. */
+  lastCollectedAt: Date
+  /** True when the storage cap discarded time beyond the window. */
+  capped: boolean
+}
+
+/**
+ * Settle one producer's accumulated window and advance its clock by only the
+ * time that actually produced whole units.
+ *
+ * The obvious implementation — award `floor(hours * rate)` and then set the
+ * clock to `now` — silently destroys the fraction on every collection, and
+ * for a slow producer that is not a rounding detail, it is the whole game.
+ * A Normal Hen lays 0.4 eggs/hour, so collecting every hour pays
+ * `floor(0.4) = 0` and resets the clock: it never lays an egg, ever, no
+ * matter how long the player plays. Collect every three hours and it yields
+ * 24 eggs a day instead of 29. The player is punished for playing often, and
+ * the only way to earn is to log in as rarely as possible, which is exactly
+ * backwards for a game whose "Collect All" button invites a click.
+ *
+ * So the remainder is carried forward: the clock only advances by the time
+ * that the whole units consumed. An uncollectable streak keeps accumulating
+ * and eventually pays out.
+ *
+ * `capHours` still discards time beyond the storage window, because that is
+ * what the cap is for, so the clock is pulled to the start of the window
+ * rather than the last collection — otherwise an over-cap collection would
+ * hand back time the player had already forfeited.
+ */
+export function settleProduction(opts: {
+  lastCollectedAt: Date
+  ratePerHour: number
+  capHours: number
+  now?: Date
+}): ProductionSettle {
+  const now = opts.now ?? new Date()
+  const cap = Number.isFinite(opts.capHours) ? Math.max(0, opts.capHours) : 0
+  const rate = Number.isFinite(opts.ratePerHour) ? Math.max(0, opts.ratePerHour) : 0
+  const last = opts.lastCollectedAt instanceof Date && !Number.isNaN(opts.lastCollectedAt.getTime())
+    ? opts.lastCollectedAt
+    : now
+
+  const hours = Math.max(0, (now.getTime() - last.getTime()) / 3600000)
+  const usableHours = Math.min(hours, cap)
+  const amount = Math.floor(usableHours * rate)
+  // Time that whole units actually paid for. At rate 0 nothing is consumed,
+  // which correctly leaves the clock alone instead of advancing a window
+  // that produced nothing.
+  const consumedHours = rate > 0 ? amount / rate : usableHours
+  // The counted window begins at the LATER of the last collection and the
+  // start of the storage window. max, not min: within the cap everything
+  // since `last` counts, and beyond it only the trailing `cap` hours do.
+  const windowStart = Math.max(last.getTime(), now.getTime() - cap * 3600000)
+
+  return {
+    amount,
+    lastCollectedAt: new Date(windowStart + consumedHours * 3600000),
+    capped: hours > cap,
+  }
 }
 
 export function henStatus(hen: { type: string; bornAt: Date }): 'active' | 'retired' {
@@ -343,7 +408,14 @@ export function henAgeDays(bornAt: Date): number {
 export function farmHealth(lastFedAt: Date | null): number {
   if (!lastFedAt) return 100
   const hours = (Date.now() - lastFedAt.getTime()) / 3600000
-  return Math.max(50, Math.round(100 - Math.floor(hours / 24) * 10))
+  // Clamped at both ends. The lower bound is the designed decay floor, but the
+  // upper one matters too: a lastFedAt in the future — clock skew, a restored
+  // backup, a server whose clock jumped — makes `hours` negative, and
+  // Math.floor of a negative is negative, so the subtraction turned into an
+  // addition and health came out ABOVE 100. Health feeds the collect maths as
+  // a multiplier, so that was a way to farm production for free.
+  const raw = Math.round(100 - Math.floor(hours / 24) * 10)
+  return Math.min(100, Math.max(50, raw))
 }
 
 export function rollHatchTable(table: { reward: string; chance: number }[]): string {
@@ -604,6 +676,22 @@ export const INCUBATOR_SLOTS = [4, 6, 8]
 export const FEED_FACTORY_DISCOUNT = [0, 10, 20, 30] // percent off feed
 export const SHELTER_BONUS = [0, 5, 10, 15] // percent animal production bonus
 export const SHELTER_CAPS = [6, 10, 16, 24] // effective animal cap per shelter level
+
+/**
+ * The shelter's production bonus, as a multiplier.
+ *
+ * A single function because the number is shown in one place and paid in
+ * another, and when those were two separate expressions they drifted: the
+ * display read SHELTER_BONUS while the collect route used an inline
+ * `1 + level * 5 / 100`. They agreed at levels 1 and 2 and then disagreed —
+ * at level 3 the player was shown +10% and paid +15%, and at level 4, shown
+ * +15% and paid +20%. Anything the player is quoted has to come from the same
+ * line of code that pays it.
+ */
+export function shelterBonusMult(level: number): number {
+  const idx = Math.min(Math.max(Math.floor(level) || 0, 0), SHELTER_BONUS.length - 1)
+  return 1 + (SHELTER_BONUS[idx] ?? 0) / 100
+}
 
 export function incubatorSlots(farm: { incubatorLevel: number }): number {
   return INCUBATOR_SLOTS[Math.min(farm.incubatorLevel, INCUBATOR_SLOTS.length) - 1] ?? 4

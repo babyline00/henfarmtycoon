@@ -6,13 +6,13 @@ import {
 } from '@/lib/economy'
 import {
   HEN_TYPES, ANIMAL_TYPES, EGG_TYPES, FEED_TYPES, UPGRADES,
-  DAILY_REWARDS, MISSIONS, productionMultiplier, farmHealth, levelIndexForXp,
+  DAILY_REWARDS, MISSIONS, productionMultiplier, farmHealth, levelIndexForXp, settleProduction,
   randomHenName, randomAnimalName, rollHatchTable,
   // Phase 8-15 additions
   henStage, henLevelMult, traitProdMult, traitLifespanMult, traitEggValueMult,
   numericLevel, LEVEL_REWARDS, rollTrait, TRAITS,
   breedOutcome, BREED_COST, BREED_COOLDOWN_HOURS,
-  ITEM_TYPES, FEED_FACTORY_DISCOUNT, SHELTER_CAPS, incubatorSlots,
+  ITEM_TYPES, FEED_FACTORY_DISCOUNT, SHELTER_CAPS, incubatorSlots, shelterBonusMult,
   GEM_PACKS, VIP_PLANS, weatherFor,
   clanLevelOf, CLAN_CREATE_COST, CLAN_MAX_MEMBERS, CLAN_WEEKLY_REWARD,
   GIFT_AMOUNT, FRIEND_LIMIT,
@@ -126,8 +126,16 @@ export async function POST(req: Request) {
       const stagePct = stage.prodPct / 100
       const lvlMult = henLevelMult(h.level)
       const traitMult = traitProdMult(traits)
-      const hours = Math.max(0, (now.getTime() - h.lastCollectedAt.getTime()) / 3600000)
-      const amount = Math.floor(Math.min(hours, storageCap) * def.eggsPerHour * mult * health * stagePct * lvlMult * traitMult)
+      // settleProduction carries the fractional remainder forward. Resettting
+      // the clock to `now` here instead cost a 0.4 eggs/hour Normal Hen every
+      // egg it ever laid whenever the player collected more than every 2.5h.
+      const settle = settleProduction({
+        lastCollectedAt: h.lastCollectedAt,
+        ratePerHour: def.eggsPerHour * mult * health * stagePct * lvlMult * traitMult,
+        capHours: storageCap,
+        now,
+      })
+      const amount = settle.amount
       if (amount > 0) {
         eggsByType[def.eggType] = (eggsByType[def.eggType] ?? 0) + amount
         collected += amount
@@ -139,7 +147,8 @@ export async function POST(req: Request) {
       while (newLevel < 10 && newXp >= newLevel * 25) { newLevel++ }
       await db.hen.update({
         where: { id: h.id },
-        data: { lastCollectedAt: now, xp: { increment: gained }, ...(newLevel > h.level ? { level: newLevel } : {}) },
+        // the settled clock, not `now` — see settleProduction
+        data: { lastCollectedAt: settle.lastCollectedAt, xp: { increment: gained }, ...(newLevel > h.level ? { level: newLevel } : {}) },
       })
     }
 
@@ -171,15 +180,21 @@ export async function POST(req: Request) {
     const storageCap = UPGRADES.storage.levels[farm.storageLevel - 1]?.cap ?? 24
     const health = farmHealth(farm.lastFedAt) / 100
     const mult = await prodMult(user.id)
-    const shelterBonus = 1 + ((farm.shelterLevel || 0) * 5) / 100
+    // Same function the state builder quotes it from, so the advertised
+    // bonus and the paid bonus cannot drift apart.
+    const shelterBonus = shelterBonusMult(farm.shelterLevel)
     let total = 0
 
     for (const a of producers) {
       const def = ANIMAL_TYPES[a.type]
-      const hours = Math.max(0, (now.getTime() - a.lastCollectedAt.getTime()) / 3600000)
-      const amount = Math.floor(Math.min(hours, storageCap) * def.coinsPerHour * mult * health * shelterBonus)
-      total += amount
-      await db.animal.update({ where: { id: a.id }, data: { lastCollectedAt: now } })
+      const settle = settleProduction({
+        lastCollectedAt: a.lastCollectedAt,
+        ratePerHour: def.coinsPerHour * mult * health * shelterBonus,
+        capHours: storageCap,
+        now,
+      })
+      total += settle.amount
+      await db.animal.update({ where: { id: a.id }, data: { lastCollectedAt: settle.lastCollectedAt } })
     }
 
     if (total === 0) return json({ ok: true, collected: 0, message: 'Animals are still producing...' })

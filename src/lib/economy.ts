@@ -371,7 +371,7 @@ export async function buildGameState(user: User) {
   const landCap = UPGRADES.land.levels[farm.landLevel - 1]?.cap ?? 6
   const incubatorCap = incubatorSlots(farm)
   const shelterCap = SHELTER_CAPS[Math.min(farm.shelterLevel, SHELTER_CAPS.length - 1)] ?? 6
-  const shelterBonus = SHELTER_BONUS[Math.min(farm.shelterLevel, SHELTER_BONUS.length - 1)] ?? 0
+  const shelterBonus = SHELTER_BONUS[Math.min(Math.max(farm.shelterLevel, 0), SHELTER_BONUS.length - 1)] ?? 0
 
   const henList = hens.map(h => {
     const def = HEN_TYPES[h.type]
