@@ -87,7 +87,7 @@ const P: Record<string, Required<SpritePalette>> = {
 // Kept as data, separate from the <svg> wrapper, so the shapes can be
 // tweaked without touching layout, sizing or accessibility.
 
-type Body = (p: Required<SpritePalette>) => JSX.Element
+type Body = (p: Required<SpritePalette>) => React.JSX.Element
 
 /** Chunky bird: shared by hen / rooster / turkey / goose / duck. */
 function birdBody(p: Required<SpritePalette>, crest: 'none' | 'comb' | 'fan' | 'tuft') {
@@ -165,7 +165,6 @@ const GEOMETRY: Record<SpriteName, Body> = {
       ))}
     </g>
   ),
-  duck:   p => birdBody(p, 'none'),
   dog: p => (
     <g>
       {quadrupedBody(p, { snout: 3, ears: 'flop', legs: 4 })}

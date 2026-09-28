@@ -83,8 +83,11 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const maybeCtx = canvas.getContext('2d')
+    if (!maybeCtx) return
+    // non-null alias: TypeScript does not carry a `const` narrowing into
+    // hoisted function declarations, and every draw helper needs it.
+    const ctx: CanvasRenderingContext2D = maybeCtx
     const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
     // Re-measured on resize. CELL drives every collision test, so a stale
