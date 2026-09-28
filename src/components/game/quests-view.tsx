@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useEffect, useState} from'react'
 import{ useGame, api} from'@/lib/store'
@@ -7,23 +7,23 @@ import{ Button} from'@/components/ui/button'
 import{ GameCard, ProgressBar, SectionTitle, EmptyState, ErrorState, LoadingSpinner} from'./shared'
 import{ cn} from'@/lib/utils'
 
-interfaceLbRow{
-  id:string; username:string; farmName:string; avatar?: stringlevelName:string; xp:number; farmValue: numbertotalHens:number; totalEggs:number; totalEarned: number}
+interface LbRow{
+  id:string; username:string; farmName:string; avatar?: string; levelName:string; xp:number; farmValue: number; totalHens:number; totalEggs:number; totalEarned: number}
 
-export functionQuestsView() {
+export function QuestsView() {
   const{ state, act, loading} = useGame()
-  const[lbCat, setLbCat]= useState<'value' | 'eggs' | 'earned'>('value')
-  const[lb, setLb]= useState<{ byValue:LbRow[]; byEggs:LbRow[]; byEarned:LbRow[]; myId: string} | null>(null)
-  const[lbError, setLbError]= useState<string| null>(null)
+  const [lbCat, setLbCat]= useState<'value' | 'eggs' | 'earned'>('value')
+  const [lb, setLb]= useState<{ byValue:LbRow[]; byEggs:LbRow[]; byEarned:LbRow[]; myId: string} | null>(null)
+  const [lbError, setLbError]= useState<string| null>(null)
 
   useEffect(() => {
     //A failed leaderboard fetch used to null thedata, which rendered the // same"Loadingrankings..." forever.Rankings are optional garnish—
     // a failure here must not look like a hang.api<{ byValue:LbRow[]; byEggs:LbRow[]; byEarned:LbRow[]; myId: string}>('/api/leaderboard')
       .then(d=> { setLb(d); setLbError(null) })
-      .catch((e:unknown) => setLbError(e instanceofError? e.message :'Could not loadrankings'))
+      .catch((e:unknown) => setLbError(e instanceof Error? e.message :'Could not loadrankings'))
   }, [state?.user.coins])
 
-  if(!state) return null const{ user, missions} = state conststreakDay= user.dailyRewardDay const rows= lb? (lbCat=== 'value' ? lb.byValue :lbCat=== 'eggs' ? lb.byEggs :lb.byEarned) : [] return(
+  if(!state) return null const{ user, missions} = state const streakDay= user.dailyRewardDay const rows= lb? (lbCat=== 'value' ? lb.byValue :lbCat=== 'eggs' ? lb.byEggs :lb.byEarned) : [] return(
     <div className="space-y-3 px-3 pb-4">
       {/* ── daily reward── */}
       <GameCard className="overflow-hidden bg-gradient-to-r from-amber-50 via-orange-50to-white">
@@ -35,7 +35,7 @@ export functionQuestsView() {
           <Buttonsize="sm"
             onClick={() => act('claim_daily')}
             disabled={loading|| !user.canClaimDaily}
-            className="h-9 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 text-xs font-extrabold text-white shadow active:scale-95disabled:opacity-40"
+            className="h-9 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-4 text-xs font-extrabold text-white shadow active:scale-95 disabled:opacity-40"
           >
             {user.canClaimDaily? 'Claim!' :'✓ Claimed'}
           </Button>
@@ -43,8 +43,8 @@ export functionQuestsView() {
 
         <div className="mt-3 grid grid-cols-7 gap-1">
           {DAILY_REWARDS.map((r, i) => {
-            const day= i+ 1 constisToday= user.canClaimDaily&& day=== streakDay const claimed= !user.canClaimDaily? day< streakDay|| day=== streakDay : day< streakDay return(
-              <divkey={i}
+            const day= i+ 1 const isToday= user.canClaimDaily&& day=== streakDay const claimed= !user.canClaimDaily? day< streakDay|| day=== streakDay : day< streakDay return(
+              <div key={i}
                 className={cn(
                   'flex flex-col items-center rounded-xl borderpy-1.5',
                   isToday? 'animate-pulse border-amber-400 bg-amber-100  shadow' : claimed? 'border-green-200bg-green-50' :'border-stone-200bg-white'
@@ -60,11 +60,11 @@ export functionQuestsView() {
       </GameCard>
 
       {/* ── daily missions── */}
-      <SectionTitleright={<span className="text-[10px] font-boldtext-stone-600">resets daily· UTC</span>}>
+      <Secti onTitleright={<span className="text-[10px] font-boldtext-stone-600">resets daily· UTC</span>}>
         🎯 DailyMissions</SectionTitle>
       <div className="space-y-2">
         {missions.map(m=> (
-          <GameCardkey={m.key}>
+          <GameCard key={m.key}>
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-xl">
                 {m.emoji}
@@ -98,10 +98,10 @@ export functionQuestsView() {
       </div>
 
       {/* ── leaderboard── */}
-      <SectionTitle>🏆 Leaderboard</SectionTitle>
+      <Secti onTitle>🏆 Leaderboard</SectionTitle>
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-stone-100  p-1">
         {(['value', 'eggs', 'earned'] asconst).map(c=> (
-          <buttonkey={c}
+          <button key={c}
             onClick={() => setLbCat(c)}
             className={cn(
               'rounded-xl py-2 text-[11px] font-extrabold transition-all',
@@ -115,14 +115,14 @@ export functionQuestsView() {
 
       {lbError? (
         <GameCard>
-          <ErrorStatetitle="Couldn't loadrankings" message={lbError} />
+          <ErrorState title="Couldn't loadrankings" message={lbError} />
         </GameCard>
       ) :!lb? (
         <GameCard><LoadingSpinnerlabel="Loadingrankings..." /></GameCard>
       ) :(
         <div className="space-y-1.5">
           {rows.map((r, i) => (
-            <GameCardkey={r.id} className={cn('flex items-center gap-3 py-2.5', r.id=== lb.myId&& 'border-amber-400bg-amber-50')}>
+            <GameCard key={r.id} className={cn('flex items-center gap-3 py-2.5', r.id=== lb.myId&& 'border-amber-400bg-amber-50')}>
               <span className={cn(
                 'w-7 text-center text-sm font-black',
                 i=== 0? 'text-amber-500' : i=== 1? 'text-stone-600' : i=== 2? 'text-orange-700' :'text-stone-600'

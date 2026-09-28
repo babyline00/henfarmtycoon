@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useEffect, useRef, useState, useCallback} from'react'
 import{ motion} from'framer-motion'
@@ -7,28 +7,28 @@ import{ cn} from'@/lib/utils'
 //══════════ Phase 33— MiniGame 2:ChickenRoadCrossing(frogger) ══════════
 //Hop cell-by-cell across endless roads· dodgecars, trucks, motorcycles& tractors //Power-ups:🛡️ shield(10s) · 🧲 magnet· ⚡ speed· ❄️ freeze traffic(5s)
 // 3 lives· score= farthest road reached· reach the farm side to win. //The client reports rawtelemetry; ALL rewards are computed server-side. interfaceProps{
-  sessionId: string tier: numbertierName: stringspeedMult: numberwinTarget: numberonEnd:(telemetry:{ score:number; coins:number; powerUps: number}) => voidonQuit:() => void}
+  sessionId: string tier: number; tierName: string; speedMult: number; winTarget: number; onEnd:(telemetry:{ score:number; coins:number; powerUps: number}) => void; onQuit:() => void}
 
-interfaceVehicle{ x:number; speed:number; emoji:string; w: number}
-interfaceRow{
+interface Vehicle{ x:number; speed:number; emoji:string; w: number}
+interface Row{
   type:'grass' | 'road' | 'goal'
   dir: 1| -1 speed: number vehicles:Vehicle[] coin: boolean // coin on this row(col stored incoinCol)
-  coinCol: numberpowerUp: string| null // shield| magnet| speed| freezepowerCol: number taken: boolean // reward on row consumed}
+  coinCol: number; powerUp: string| null // shield| magnet| speed| freezepowerCol: number taken: boolean // reward on row consumed}
 
-constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ key:string; emoji: string}[]= [{ key:'shield', emoji:'🛡️' }, { key:'magnet', emoji:'🧲' },
+const COLS = 5 const VEHICLES = ['🚗', '🚚', '🏍️', '🚜'] const POWERS:{ key:string; emoji: string}[]= [{ key:'shield', emoji:'🛡️' }, { key:'magnet', emoji:'🧲' },
   { key:'speed', emoji:'⚡' }, { key:'freeze', emoji:'❄️' },
-] export functionRoadCrossing({ sessionId, tier, tierName, speedMult, winTarget, onEnd, onQuit}:Props) {
-  constcanvasRef= useRef<HTMLCanvasElement>(null)
-  const[hud, setHud]= useState({
+] export function RoadCrossing({ sessionId, tier, tierName, speedMult, winTarget, onEnd, onQuit}:Props) {
+  const canvasRef= useRef<HTMLCanvasElement>(null)
+  const [hud, setHud]= useState({
     row:0, target:winTarget+ tier* 4, lives:3, coins:0,
     powers: [] as{ key:string; left: number}[], night: tier>= 2, frozen:0,
   })
-  const[ended, setEnded]= useState<null| 'win' | 'loss'>(null)
-  constendedRef= useRef(false)
-  constonEndRef= useRef(onEnd)
+  const [ended, setEnded]= useState<null| 'win' | 'loss'>(null)
+  const endedRef= useRef(false)
+  const onEndRef= useRef(onEnd)
   useEffect(() => { onEndRef.current= onEnd})
 
-  const target= winTarget+ tier* 4 conststateRef= useRef({
+  const target= winTarget+ tier* 4 const stateRef= useRef({
     col:2, row:0, renderRow:0,
     hopT:-1, hopFromRow:0, hopFromCol:2,
     lives:3, invuln:0,
@@ -40,7 +40,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
   })
 
   const finish= useCallback((result:'win' | 'loss') => {
-    if(endedRef.current) returnendedRef.current= truestateRef.current.running= falsesetEnded(result)
+    if(endedRef.current) return endedRef.current= truestateRef.current.running= falsesetEnded(result)
     const s= stateRef.currentsetTimeout(() => {
       onEndRef.current({ score:s.row, coins:s.coins, powerUps:s.powerUpsCollected})
     }, 900)
@@ -52,19 +52,19 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
     //Re-measured on resize.CELL drives every collisiontest, so a stale // value after rotation made the player collide in the wrong places. letW = canvas.clientWidth letH = canvas.clientHeight letCELL = W /COLS
 
     const resize= () => {
-      W = canvas.clientWidthH = canvas.clientHeight if(W === 0|| H === 0) returnCELL = W /COLS
+      W = canvas.clientWidthH = canvas.clientHeight if(W === 0|| H === 0) return CELL = W /COLS
       canvas.width= Math.round(W * dpr)
       canvas.height= Math.round(H * dpr)
       //setTransform, not scale:scale() accumulates across calls.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
 
-    const ro= typeofResizeObserver!== 'undefined' ? newResizeObserver(resize) : nullro?.observe(canvas)
+    const ro= typeof ResizeObserver!== 'undefined' ? new ResizeObserver(resize) : nullro?.observe(canvas)
 
     const s= stateRef.current let raf= 0 let last= performance.now()
 
     //── procedural rows──
-    functionensureRows(upto:number) {
+    function ensureRows(upto:number) {
       while(s.rows.length<= upto) {
         const i= s.rows.length if(i<= 1) {
           s.rows.push({ type:'grass', dir:1, speed:0, vehicles:[], coin:false, coinCol:0, powerUp:null, powerCol:0, taken: false})
@@ -74,8 +74,8 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
           s.rows.push({ type:'goal', dir:1, speed:0, vehicles:[], coin:false, coinCol:0, powerUp:null, powerCol:0, taken: false})
           continue}
         // difficulty: road probability rises with row index& tier constroadProb= Math.min(0.8, 0.45+ i* 0.008+ tier* 0.05)
-        constisRoad= Math.random() < roadProb if(isRoad) {
-          const dir: 1| -1= Math.random() < 0.5? 1 : -1 constbaseSpeed= (60+ Math.random() * 70+ i* 1.2) * speedMult constnVeh= Math.random() < Math.min(0.55, 0.18+ i* 0.01+ tier* 0.04) ? 2 : 1 const vehicles:Vehicle[]= [] for(let v= 0; v< nVeh; v++) {
+        const isRoad= Math.random() < roadProb if(isRoad) {
+          const dir: 1| -1= Math.random() < 0.5? 1 : -1 const baseSpeed= (60+ Math.random() * 70+ i* 1.2) * speedMult const nVeh= Math.random() < Math.min(0.55, 0.18+ i* 0.01+ tier* 0.04) ? 2 : 1 const vehicles:Vehicle[]= [] for(let v= 0; v< nVeh; v++) {
             const vi= Math.floor(Math.random() * VEHICLES.length)
             vehicles.push({
               x:(W /(nVeh+ 1)) * (v+ 1) + Math.random() * 60,
@@ -90,7 +90,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
             powerUp:null, powerCol:0, taken:false,
           })
         } else{
-          constpowerRoll= Math.random() < 0.14s.rows.push({
+          const powerRoll= Math.random() < 0.14s.rows.push({
             type:'grass', dir:1, speed:0, vehicles:[],
             coin:!powerRoll&& Math.random() < 0.4, coinCol:Math.floor(Math.random() * COLS),
             powerUp:powerRoll? POWERS[Math.floor(Math.random() * POWERS.length)].key :null,
@@ -103,20 +103,20 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
     ensureRows(30)
 
     //── input──
-    functionhop(dc:number, dr:number) {
+    function hop(dc:number, dr:number) {
       if(!s.running|| endedRef.current) return if(s.hopCooldown> 0) return const nc= Math.max(0, Math.min(COLS -1, s.col+ dc))
       const nr= Math.max(0, s.row+ dr)
       if(nc=== s.col&& nr=== s.row) returns.hopFromCol= s.col; s.hopFromRow= s.row s.col= nc; s.row= nrs.hopT = 0s.hopCooldown= s.speed> 0? 0.1 : 0.17}
 
-    lettouchStart:{ x:number; y: number} | null= null constonTouchStart= (e:TouchEvent) => {
+    lettouchStart:{ x:number; y: number} | null= null const onTouchStart= (e:TouchEvent) => {
       const t= e.changedTouches[0]touchStart= { x:t.clientX, y:t.clientY }
     }
-    constonTouchEnd= (e:TouchEvent) => {
+    const onTouchEnd= (e:TouchEvent) => {
       if(!touchStart) return const t= e.changedTouches[0] const dx= t.clientX -touchStart.x const dy= t.clientY -touchStart.y if(Math.abs(dx) < 20&& Math.abs(dy) < 20) hop(0, 1)
       else if(Math.abs(dx) > Math.abs(dy)) hop(dx> 0? 1 :-1, 0)
-      elsehop(0, dy< 0? 1 :-1)
+      else hop(0, dy< 0? 1 :-1)
       touchStart= null}
-    constonKey= (e:KeyboardEvent) => {
+    const onKey= (e:KeyboardEvent) => {
       const map:Record<string, [number, number]> = {
         ArrowUp:[0, 1], ArrowDown:[0, -1], ArrowLeft:[-1, 0], ArrowRight:[1, 0],
         w:[0, 1], s:[0, -1], a:[-1, 0], d:[1, 0],
@@ -128,13 +128,13 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
     canvas.addEventListener('touchend', onTouchEnd, { passive: true})
     window.addEventListener('keydown', onKey)
 
-    constonHidden= () => {
+    const onHidden= () => {
       if(document.hidden&& !endedRef.current) finish(s.row>= target? 'win' :'loss')
     }
     document.addEventListener('visibilitychange', onHidden)
 
     //── loop──
-    functionloop(now:number) {
+    function loop(now:number) {
       raf= requestAnimationFrame(loop)
       const dt= Math.min(0.05, (now -last) /1000)
       last= now if(!s.running|| endedRef.current) { draw(); return}
@@ -177,7 +177,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
       draw()
     }
 
-    functiononArrive() {
+    function onArrive() {
       const r= s.rows[s.row] if(!r|| r.taken) return // magnet: collect nearby coins automatically constcollectRadius= s.magnet> 0? 1 : 0 for(let i= Math.max(0, s.row -collectRadius); i<= s.row+ collectRadius; i++) {
         const rr= s.rows[i] if(rr&& !rr.taken&& rr.coin&& (i!== s.row|| rr.coinCol=== s.col|| s.magnet> 0)) {
           rr.taken= trues.coins++
@@ -190,19 +190,19 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
       if(r.type=== 'goal') finish('win')
     }
 
-    functionhitVehicle() {
+    function hitVehicle() {
       s.lives-= 1 s.invuln= 1.6 if(s.lives<= 0) { finish('loss'); return}
       // knock back one row for realism if(s.row> 0) { s.hopFromRow= s.row; s.row-= 1; s.hopT = 0}
     }
 
-    functiondraw() {
-      constcamY = H * 0.72 // chicken anchored near bottom const night= tier>= 2 // base backgroundctx!.fillStyle= night? '#0f172a' :'#7dd87d'
+    function draw() {
+      const camY = H * 0.72 // chicken anchored near bottom const night= tier>= 2 // base backgroundctx!.fillStyle= night? '#0f172a' :'#7dd87d'
       ctx!.fillRect(0, 0, W, H)
 
-      constrowIndexToY = (i:number) => camY -(i -s.renderRow) * CELL
+      const rowIndexToY = (i:number) => camY -(i -s.renderRow) * CELL
 
       // visible rows constfirstRow= Math.max(0, Math.floor(s.renderRow) -Math.ceil(camY /CELL) -1)
-      constlastRow= Math.min(s.rows.length -1, Math.ceil(s.renderRow+ (H -camY) /CELL) + 2)
+      const lastRow= Math.min(s.rows.length -1, Math.ceil(s.renderRow+ (H -camY) /CELL) + 2)
       for(let i= firstRow; i<= lastRow; i++) {
         const r= s.rows[i] if(!r) continue const y= rowIndexToY(i)
         // row background if(r.type=== 'road') {
@@ -241,7 +241,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
             ctx!.fillText(v.emoji, v.x, y)
             // headlight glow at night if(night&& s.freeze<= 0) {
               ctx!.fillStyle= '#fbbf2422'
-              constglowDir= r.dirctx!.beginPath()
+              const glowDir= r.dirctx!.beginPath()
               ctx!.ellipse(v.x+ glowDir* vw(v) * 0.9, y, CELL * 0.9, CELL * 0.35, 0, 0, Math.PI * 2)
               ctx!.fill()
             }
@@ -272,7 +272,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
       }
     }
 
-    functionvw(v:Vehicle) { return v.w}
+    function vw(v:Vehicle) { return v.w}
 
     raf= requestAnimationFrame(loop)
     return() => {
@@ -304,7 +304,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
         <span className="text-sm">{'❤️'.repeat(hud.lives)}{'🖤'.repeat(Math.max(0, 3 -hud.lives))}</span>
         <div className="flex items-center gap-2 text-[11px] font-bold">
           {hud.powers.map(p=> (
-            <spankey={p.key} className="rounded-full bg-white/10 px-2 py-0.5 tabular-nums">
+            <span key={p.key} className="rounded-full bg-white/10 px-2 py-0.5 tabular-nums">
               {POWERS.find(x=> x.key=== p.key)?.emoji} {p.left}s</span>
           ))}
           {hud.frozen> 0&& <span className="text-cyan-300">❄️ {hud.frozen}s</span>}
@@ -313,7 +313,7 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
       </div>
 
       <div className="relative flex-1">
-        <canvasref={canvasRef} className="h-full w-full touch-noneselect-none" />
+        <canvas ref={canvasRef} className="h-full w-full touch-noneselect-none" />
 
         {/* on-screen d-pad(mobile) */}
         <div className="absolute inset-x-0 bottom-2 flex items-end justify-center gap-2">
@@ -328,9 +328,9 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
         </div>
 
         {ended&& (
-          <motion.divinitial={{ opacity: 0}} animate={{ opacity: 1}}
+          <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}}
             className="absolute inset-0 flex flex-col items-center justify-centerbg-black/70">
-            <motion.divanimate={{ scale:[1, 1.2, 1]}} transition={{ repeat:Infinity, duration: 1.2}} className="text-7xl">
+            <motion.div animate={{ scale:[1, 1.2, 1]}} transition={{ repeat:Infinity, duration: 1.2}} className="text-7xl">
               {ended=== 'win' ? '🏡' :'💥'}
             </motion.div>
             <p className="mt-3 text-2xl font-black text-white">{ended=== 'win' ? 'REACHED THE FARM!' :'SPLAT!'}</p>
@@ -342,6 +342,6 @@ constCOLS = 5 constVEHICLES = ['🚗', '🚚', '🏍️', '🚜'] constPOWERS:{ 
   )
 }
 
-functiondispatchKey(key:string) {
-  window.dispatchEvent(newKeyboardEvent('keydown', { key}))
+function dispatchKey(key:string) {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key}))
 }

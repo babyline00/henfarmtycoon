@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useCallback, useEffect, useState} from'react'
 import{ motion} from'framer-motion'
@@ -13,83 +13,83 @@ import{
   CartesianGrid, PieChart, Pie, Cell, Legend,
 } from'recharts'
 
-typeTab= 'dashboard' | 'users' | 'withdrawals' | 'finance' | 'economy' | 'events' | 'broadcast' | 'analytics' | 'security' | 'games' | 'support'
+type Tab= 'dashboard' | 'users' | 'withdrawals' | 'finance' | 'economy' | 'events' | 'broadcast' | 'analytics' | 'security' | 'games' | 'support'
 
-interfaceStats{
+interface Stats{
   stats:{
-    totalUsers:number; activeToday:number; newToday: numbertotalHens:number; totalAnimals: numbertotalEggsHatched:number; totalEggsInInventory: numbercoinsInCirculation:number; gemsInCirculation: numberpendingWithdrawals:number; totalWithdrawn: numbertotalTransactions:number; marketSales:number; serverStatus: stringrevenueCents:number; purchaseCount:number; vipCount:number; todayRevenueCents: number //Phase 34— wallettotalDepositCents:number; depositCount:number; pendingDeposits:number; wdFeesCollected: number}
+    totalUsers:number; activeToday:number; newToday: number; totalHens:number; totalAnimals: number; totalEggsHatched:number; totalEggsInInventory: number; coinsInCirculation:number; gemsInCirculation: number; pendingWithdrawals:number; totalWithdrawn: number; totalTransactions:number; marketSales:number; serverStatus: string; revenueCents:number; purchaseCount:number; vipCount:number; todayRevenueCents: number //Phase 34— wallettotalDepositCents:number; depositCount:number; pendingDeposits:number; wdFeesCollected: number}
   growth:{ date:string; users: number}[]topHolders:{ username:string; coins: number}[]txByType:Record<string, number>
   events:{ id:string; name:string; active:boolean; multiplier:number; endsAt: string}[]}
 
-interfaceAnalyticsData{
+interface AnalyticsData{
   dauSeries:{ date:string; dau:number; newUsers: number}[]economySeries:{ date:string; generated:number; spent:number; marketVolume: number}[]revenueSeries:{ date:string; revenueCents: number}[]eggSeries:{ date:string; laid:number; hatched: number}[] retention:{ d1:number; d3:number; sessionsPerUser:number; totalSessions7d: number}
   topSpenders:{ userId:string; username:string; cents:number; count: number}[]revenueBySku:{ sku:string; count:number; cents: number}[]economyHealth:{ totalGenerated14d:number; totalSpent14d:number; netCoinFlow:number; signal: string}
-  vipCount: numbertodayRevenueCents: number}
+  vipCount: number; todayRevenueCents: number}
 
-interfaceSecurityData{
+interface SecurityData{
   events:{ id:string; kind:string; detail:string; createdAt:string; username:string; farmName:string; userId: string}[] flagged:{ id:string; username:string; farmName:string; avatar:string; flagReason:string; coins:number; isBlocked: boolean}[] logs:{ id:string; adminName:string; action:string; detail:string; createdAt: string}[] summary:{ rateLimitedCount:number; priceAbuseCount:number; flaggedCount:number; adminCount: number}
   admins:{ id:string; username:string; farmName:string; role:string; roleLabel:string; lastSeenAt: string}[]roleMatrix:{ role:string; roleLabel:string; perms: string[]}[] me:{ id:string; role:string; roleLabel: string}
 }
 
-interfaceMiniGamesData{
+interface MiniGamesData{
   games:{ id:string; key:string; name:string; emoji:string; description:string; enabled:boolean; energyCost:number; plays:number; wins:number; losses:number; rejected: number}[] totals:{ totalPlays:number; coinsAwarded:number; xpAwarded:number; metersRan:number; playsToday:number; cheatedCount: number}
   cheated:{ id:string; gameKey:string; createdAt:string; username:string; farmName:string; flagged: boolean}[] recent:{ id:string; gameKey:string; username:string; avatar:string; score:number; distance:number; coins:number; result:string; cheated:boolean; createdAt: string}[] season:{
     rewards:{ rank:number; prize:string; emoji:string; detail: string}[]monthKey:string; paid: boolean top3:{ rank:number; userId:string; username:string; avatar:string; totalScore:number; reward: string}[]}
 }
 
-interfaceSupportData{
+interface SupportData{
   counts:{ open:number; answered:number; closed: number}
   tickets:{
     id:string; userId:string; username:string; subject:string; category: string status:string; assignedTo: string| null; createdAt:string; updatedAt: string messages:{ id:string; sender:string; senderName:string; body:string; createdAt: string}[]}[]}
 
-interfaceAdminUser{
-  id:string; username:string; email?: string| null; farmName:string; avatar: string coins:number; gems:number; levelName:string; xp: numberisAdmin:boolean; isBlocked:boolean; referralCode: stringadminRole: string| null; roleLabel: string| null flagged:boolean; flagReason: string| null; vipActive:boolean; numericLevel: number hens:number; animals:number; coopLevel: numbertotalEarned:number; totalEggsHatch: numbercreatedAt:string; lastSeenAt: string}
+interface AdminUser{
+  id:string; username:string; email?: string| null; farmName:string; avatar: string coins:number; gems:number; levelName:string; xp: number; isAdmin:boolean; isBlocked:boolean; referralCode: string; adminRole: string| null; roleLabel: string| null flagged:boolean; flagReason: string| null; vipActive:boolean; numericLevel: number hens:number; animals:number; coopLevel: number; totalEarned:number; totalEggsHatch: number; createdAt:string; lastSeenAt: string}
 
-interfaceWd{
-  id:string; userId:string; username:string; amount: number method:string; address:string; accountTitle:string; bankName: string fee:number; status: stringcreatedAt:string; note?: string| null}
+interface Wd{
+  id:string; userId:string; username:string; amount: number method:string; address:string; accountTitle:string; bankName: string fee:number; status: string; createdAt:string; note?: string| null}
 
 //Phase 34— wallet interfaceDep{
   id:string; userId:string; username:string; amountCents: number method:string; senderName:string; reference:string; proof?: string| null coins:number; bonusCoins:number; status:string; note?: string| nullcreatedAt:string; processedAt?: string| null; processedBy?: string| null}
-interfaceDepStats{ totalApprovedCents:number; coinsIssued:number; pendingCount: number}
-interfacePayField{ key:string; label:string; placeholder:string; copyable?: boolean}
-interfacePayMethodDef{ key:string; name:string; emoji:string; instructions:string; fields:PayField[]}
-interfacePayMethodAcc{ enabled:boolean; [k: string]: unknown}
+interface DepStats{ totalApprovedCents:number; coinsIssued:number; pendingCount: number}
+interface PayField{ key:string; label:string; placeholder:string; copyable?: boolean}
+interface PayMethodDef{ key:string; name:string; emoji:string; instructions:string; fields:PayField[]}
+interface PayMethodAcc{ enabled:boolean; [k: string]: unknown}
 
-constUSD = (c:number) => `$${(c /100).toFixed(2)}`
+const USD = (c:number) => `$${(c /100).toFixed(2)}`
 
-constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855f7', '#84cc16', '#ef4444'] export functionAdminPanel() {
+const PIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855f7', '#84cc16', '#ef4444'] export function AdminPanel() {
   const{ setAdminOpen, refresh, showFlash} = useGame()
-  const[tab, setTab]= useState<Tab>('dashboard')
-  const[stats, setStats]= useState<Stats| null>(null)
-  const[users, setUsers]= useState<AdminUser[]>([])
-  const[search, setSearch]= useState('')
-  const[wds, setWds]= useState<Wd[]>([])
-  const[deposits, setDeposits]= useState<Dep[]>([])
-  const[depStats, setDepStats]= useState<DepStats| null>(null)
-  const[depFilter, setDepFilter]= useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
-  const[proofView, setProofView]= useState<Dep| null>(null)
-  const[depNote, setDepNote]= useState('')
-  const[payDefs, setPayDefs]= useState<PayMethodDef[]>([])
-  const[payMethods, setPayMethods]= useState<Record<string, PayMethodAcc>>({})
-  const[config, setConfig]= useState<Record<string, string>>({})
-  const[events, setEvents]= useState<{ id:string; name:string; description:string; multiplier:number; endsAt:string; active: boolean}[]>([])
-  const[evName, setEvName]= useState('')
-  const[evDesc, setEvDesc]= useState('')
-  const[evMult, setEvMult]= useState('150')
-  const[evDays, setEvDays]= useState('3')
-  const[bcTitle, setBcTitle]= useState('')
-  const[bcMsg, setBcMsg]= useState('')
-  const[busy, setBusy]= useState(false)
-  const[analytics, setAnalytics]= useState<AnalyticsData| null>(null)
-  const[security, setSecurity]= useState<SecurityData| null>(null)
-  const[miniGames, setMiniGames]= useState<MiniGamesData| null>(null)
-  const[support, setSupport]= useState<SupportData| null>(null)
-  const[supportFilter, setSupportFilter]= useState('open')
-  const[ticketReply, setTicketReply]= useState<Record<string, string>>({})
+  const [tab, setTab]= useState<Tab>('dashboard')
+  const [stats, setStats]= useState<Stats| null>(null)
+  const [users, setUsers]= useState<AdminUser[]>([])
+  const [search, setSearch]= useState('')
+  const [wds, setWds]= useState<Wd[]>([])
+  const [deposits, setDeposits]= useState<Dep[]>([])
+  const [depStats, setDepStats]= useState<DepStats| null>(null)
+  const [depFilter, setDepFilter]= useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
+  const [proofView, setProofView]= useState<Dep| null>(null)
+  const [depNote, setDepNote]= useState('')
+  const [payDefs, setPayDefs]= useState<PayMethodDef[]>([])
+  const [payMethods, setPayMethods]= useState<Record<string, PayMethodAcc>>({})
+  const [config, setConfig]= useState<Record<string, string>>({})
+  const [events, setEvents]= useState<{ id:string; name:string; description:string; multiplier:number; endsAt:string; active: boolean}[]>([])
+  const [evName, setEvName]= useState('')
+  const [evDesc, setEvDesc]= useState('')
+  const [evMult, setEvMult]= useState('150')
+  const [evDays, setEvDays]= useState('3')
+  const [bcTitle, setBcTitle]= useState('')
+  const [bcMsg, setBcMsg]= useState('')
+  const [busy, setBusy]= useState(false)
+  const [analytics, setAnalytics]= useState<AnalyticsData| null>(null)
+  const [security, setSecurity]= useState<SecurityData| null>(null)
+  const [miniGames, setMiniGames]= useState<MiniGamesData| null>(null)
+  const [support, setSupport]= useState<SupportData| null>(null)
+  const [supportFilter, setSupportFilter]= useState('open')
+  const [ticketReply, setTicketReply]= useState<Record<string, string>>({})
 
-  constloadAll= useCallback(async() => {
+  const loadAll= useCallback(async() => {
     try{
-      const[s, u, w, c, e]= awaitPromise.all([api<Stats>('/api/admin/stats'),
+      const [s, u, w, c, e]= await Promise.all([api<Stats>('/api/admin/stats'),
         api<{ users:AdminUser[]}>(`/api/admin/users?q=${encodeURIComponent(search)}`),
         api<{ withdrawals:Wd[]}>('/api/admin/withdrawals'),
         api<{ config:Record<string, string> }>('/api/admin/config'),
@@ -97,23 +97,23 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
       ])
       setStats(s); setUsers(u.users); setWds(w.withdrawals); setConfig(c.config); setEvents(e.events)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to load admindata', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to load admindata', 'error')
     }
   }, [search, showFlash])
 
-  constloadAnalytics= useCallback(async() => {
+  const loadAnalytics= useCallback(async() => {
     try{
-      setAnalytics(awaitapi<AnalyticsData>('/api/admin/analytics'))
+      setAnalytics(await api<AnalyticsData>('/api/admin/analytics'))
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to loadanalytics', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to loadanalytics', 'error')
     }
   }, [showFlash])
 
-  constloadSecurity= useCallback(async() => {
+  const loadSecurity= useCallback(async() => {
     try{
-      setSecurity(awaitapi<SecurityData>('/api/admin/security'))
+      setSecurity(await api<SecurityData>('/api/admin/security'))
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to load securitydata', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to load securitydata', 'error')
     }
   }, [showFlash])
 
@@ -121,86 +121,86 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
   useEffect(() => { if(tab=== 'analytics') loadAnalytics() }, [tab, loadAnalytics])
   useEffect(() => { if(tab=== 'security') loadSecurity() }, [tab, loadSecurity])
 
-  constloadFinance= useCallback(async() => {
+  const loadFinance= useCallback(async() => {
     try{
-      const[d, p]= awaitPromise.all([api<{ deposits:Dep[]; stats:DepStats}>(`/api/admin/deposits${depFilter=== 'all' ? '' :`?status=${depFilter}`}`),
+      const [d, p]= await Promise.all([api<{ deposits:Dep[]; stats:DepStats}>(`/api/admin/deposits${depFilter=== 'all' ? '' :`?status=${depFilter}`}`),
         api<{ methods:Record<string, PayMethodAcc>; defs:PayMethodDef[]}>('/api/admin/payment-settings'),
       ])
       setDeposits(d.deposits); setDepStats(d.stats); setPayMethods(p.methods); setPayDefs(p.defs)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to load financedata', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to load financedata', 'error')
     }
   }, [depFilter, showFlash])
 
   useEffect(() => { if(tab=== 'finance') loadFinance() }, [tab, loadFinance])
 
-  constloadMiniGames= useCallback(async() => {
+  const loadMiniGames= useCallback(async() => {
     try{
-      setMiniGames(awaitapi<MiniGamesData>('/api/admin/minigames'))
+      setMiniGames(await api<MiniGamesData>('/api/admin/minigames'))
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to load minigames', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to load minigames', 'error')
     }
   }, [showFlash])
 
-  constloadSupport= useCallback(async(filter:string) => {
+  const loadSupport= useCallback(async(filter:string) => {
     try{
-      setSupport(awaitapi<SupportData>(`/api/admin/support?status=${filter}`))
+      setSupport(await api<SupportData>(`/api/admin/support?status=${filter}`))
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to loadtickets', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to loadtickets', 'error')
     }
   }, [showFlash])
 
   useEffect(() => { if(tab=== 'games') loadMiniGames() }, [tab, loadMiniGames])
   useEffect(() => { if(tab=== 'support') loadSupport(supportFilter) }, [tab, supportFilter, loadSupport])
 
-  async functiongameAdmin(action:string, extra?:Record<string, unknown>) {
+  async function gameAdmin(action:string, extra?:Record<string, unknown>) {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/minigames', { method:'POST', body:{ action, ...extra} })
+      const res= await api<{ message: string}>('/api/admin/minigames', { method:'POST', body:{ action, ...extra} })
       showFlash(res.message)
-      awaitloadMiniGames()
+      await loadMiniGames()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functionticketAdmin(ticketId:string, action:string, message?:string) {
+  async function ticketAdmin(ticketId:string, action:string, message?:string) {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/support', { method:'POST', body:{ ticketId, action, message} })
+      const res= await api<{ message: string}>('/api/admin/support', { method:'POST', body:{ ticketId, action, message} })
       showFlash(res.message)
-      awaitloadSupport(supportFilter)
+      await loadSupport(supportFilter)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functionuserAction(userId:string, action:string, extra?:Record<string, unknown>) {
+  async function userAction(userId:string, action:string, extra?:Record<string, unknown>) {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/users', {
+      const res= await api<{ message: string}>('/api/admin/users', {
         method:'POST', body:{ userId, action, ...extra},
       })
       showFlash(res.message)
-      awaitloadAll()
-      awaitrefresh()
+      await loadAll()
+      await refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{
       setBusy(false)
     }
   }
 
-  async functionwdAction(id:string, action:string) {
+  async function wdAction(id:string, action:string) {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/withdrawals', {
+      const res= await api<{ message: string}>('/api/admin/withdrawals', {
         method:'POST', body:{ id, action},
       })
       showFlash(res.message)
-      awaitloadAll()
+      await loadAll()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{
       setBusy(false)
     }
@@ -209,42 +209,42 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
   //Phase 34— deposits verification async functiondepAction(id:string, action:'approve' | 'reject') {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/deposits', {
+      const res= await api<{ message: string}>('/api/admin/deposits', {
         method:'POST', body:{ id, action, note:depNote|| undefined},
       })
       showFlash(res.message)
       setDepNote('')
-      awaitloadFinance()
-      awaitloadAll()
-      awaitrefresh()
+      await loadFinance()
+      await loadAll()
+      await refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{
       setBusy(false)
     }
   }
 
-  async functionsavePaySettings() {
+  async function savePaySettings() {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/payment-settings', {
+      const res= await api<{ message: string}>('/api/admin/payment-settings', {
         method:'POST', body:{ methods:payMethods},
       })
       showFlash(res.message)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{
       setBusy(false)
     }
   }
 
-  async functionsaveConfig() {
+  async function saveConfig() {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/config', { method:'POST', body:{ config} })
+      const res= await api<{ message: string}>('/api/admin/config', { method:'POST', body:{ config} })
       showFlash(res.message)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
@@ -252,57 +252,57 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
     setConfig(c=> ({ ...c, [key]:String(value) }))
     setBusy(true)
     try{
-      awaitapi('/api/admin/config', { method:'POST', body:{ config:{ [key]: value} } })
+      await api('/api/admin/config', { method:'POST', body:{ config:{ [key]: value} } })
       showFlash(`⚙️ ${key} → ${value=== 1? 'ENABLED' :'disabled'}`)
-      awaitrefresh()
+      await refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functioncreateEvent() {
+  async function createEvent() {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/events', {
+      const res= await api<{ message: string}>('/api/admin/events', {
         method:'POST',
         body:{ action:'create', name:evName, description:evDesc, multiplier:Number(evMult), days:Number(evDays) },
       })
       showFlash(res.message)
       setEvName(''); setEvDesc('')
-      awaitloadAll()
-      awaitrefresh()
+      await loadAll()
+      await refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functioneventAction(id:string, action:string) {
+  async function eventAction(id:string, action:string) {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/events', { method:'POST', body:{ action, id} })
+      const res= await api<{ message: string}>('/api/admin/events', { method:'POST', body:{ action, id} })
       showFlash(res.message)
-      awaitloadAll()
-      awaitrefresh()
+      await loadAll()
+      await refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functionbroadcast() {
+  async function broadcast() {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/admin/broadcast', {
+      const res= await api<{ message: string}>('/api/admin/broadcast', {
         method:'POST', body:{ title:bcTitle, message:bcMsg},
       })
       showFlash(res.message)
       setBcTitle(''); setBcMsg('')
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     } finally{ setBusy(false) }
   }
 
   return(
-    <motion.divinitial={{ x:'100%' }} animate={{ x: 0}}
+    <motion.div initial={{ x:'100%' }} animate={{ x: 0}}
       className="fixed inset-0 z-50 flex flex-colbg-stone-100"
     >
       {/* header*/}
@@ -339,7 +339,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
           ['broadcast', '📢 Notify'],
           ['security', '🔐 Security'],
         ] as[Tab, string][]).map(([t, label]) => (
-          <buttonkey={t}
+          <button key={t}
             onClick={() => setTab(t)}
             className={cn(
               'shrink-0 rounded-full px-3 py-1.5 text-[11px] font-extrabold transition-all',
@@ -373,13 +373,13 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             <GameCard>
               <p className="mb-2 text-xs font-blacktext-stone-700">📈 NewUsers(last 14days)</p>
               <div className="h-44">
-                <ResponsiveContainerwidth="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChartdata={stats.growth}>
                     <CartesianGridstrokeDasharray="33" stroke="#e7e5e4" />
                     <XAxisdataKey="date" tick={{ fontSize: 10}} />
                     <YAxistick={{ fontSize: 10}} allowDecimals={false} />
                     <TooltipcontentStyle={{ fontSize:12, borderRadius: 12}} />
-                    <Linetype="monotone" dataKey="users" stroke="#16a34a" strokeWidth={3} dot={{ r: 3}} />
+                    <Line type="monotone" dataKey="users" stroke="#16a34a" strokeWidth={3} dot={{ r: 3}} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -389,9 +389,9 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <GameCard>
                 <p className="mb-2 text-xs font-blacktext-stone-700">💰 TopCoinHolders</p>
                 <div className="h-40">
-                  <ResponsiveContainerwidth="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChartdata={stats.topHolders} layout="vertical">
-                      <XAxistype="number" hide/>
+                      <XAxis type="number" hide/>
                       <YAxisdataKey="username" type="category" tick={{ fontSize: 10}} width={80} />
                       <TooltipcontentStyle={{ fontSize:12, borderRadius: 12}} />
                       <BardataKey="coins" fill="#eab308" radius={[0, 8, 8, 0]} />
@@ -403,14 +403,14 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <GameCard>
                 <p className="mb-2 text-xs font-blacktext-stone-700">📊 CoinFlow byType(7d)</p>
                 <div className="h-40">
-                  <ResponsiveContainerwidth="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Piedata={Object.entries(stats.txByType).map(([k, v]) => ({ name:k, value: v}))}
                         dataKey="value" nameKey="name" innerRadius={30} outerRadius={60}
                         paddingAngle={2}
                       >
                         {Object.entries(stats.txByType).map((_, i) => (
-                          <Cellkey={i} fill={PIE_COLORS[i% PIE_COLORS.length]} />
+                          <Cell key={i} fill={PIE_COLORS[i% PIE_COLORS.length]} />
                         ))}
                       </Pie>
                       <TooltipcontentStyle={{ fontSize:11, borderRadius: 12}} />
@@ -436,13 +436,13 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
         {/* ════════ USERS ════════ */}
         {tab=== 'users' && (
           <div className="space-y-2">
-            <Inputvalue={search}
+            <Input value={search}
               onChange={e=> setSearch(e.target.value)}
               placeholder="🔍 Search by username or farmname..."
               className="h-10 rounded-xl border-stone-200bg-white"
             />
             {users.map(u=> (
-              <UserRowkey={u.id} u={u} busy={busy} onAction={userAction} onDone={loadAll} />
+              <UserRow key={u.id} u={u} busy={busy} onAction={userAction} onDone={loadAll} />
             ))}
             {users.length=== 0&& <GameCard><EmptyStateemoji="🔍" title="No usersfound" /></GameCard>}
           </div>
@@ -455,7 +455,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
           ) :(
             <div className="space-y-2">
               {wds.map(w=> (
-                <GameCardkey={w.id} className={cn(w.status=== 'pending' && 'border-amber-300bg-amber-50/50')}>
+                <GameCard key={w.id} className={cn(w.status=== 'pending' && 'border-amber-300bg-amber-50/50')}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-blacktext-stone-800">🪙 {w.amount.toLocaleString()} · {w.method.toUpperCase()}</p>
@@ -463,7 +463,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                       <p className="text-[11px] font-boldtext-stone-600">👤 {w.accountTitle|| '—'}{w.bankName? ` · 🏦 ${w.bankName}` :''}</p>
                       <p className="truncate text-[10px]text-stone-600">📍 {w.address}</p>
                       <p className="text-[10px] font-boldtext-green-700">Payout after fee:🪙 {(w.amount -w.fee).toLocaleString()} (fee🪙 {w.fee.toLocaleString()})</p>
-                      <p className="text-[9px]text-stone-600">{newDate(w.createdAt).toLocaleString()}</p>
+                      <p className="text-[9px]text-stone-600">{new Date(w.createdAt).toLocaleString()}</p>
                     </div>
                     <span className={cn(
                       'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase',
@@ -480,7 +480,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                       <Buttonsize="sm" disabled={busy} onClick={() => wdAction(w.id, 'approve')}
                         className="h-8 flex-1 rounded-lg bg-green-700 text-[11px] font-extrabold text-white">
                         ✅ Approve</Button>
-                      <Buttonsize="sm" variant="outline" disabled={busy} onClick={() => wdAction(w.id, 'hold')}
+                      <Buttonsize="sm" var iant="outline" disabled={busy} onClick={() => wdAction(w.id, 'hold')}
                         className="h-8 flex-1 rounded-lg text-[11px] font-bold">
                         ⏸ Hold</Button>
                       <Buttonsize="sm" disabled={busy} onClick={() => wdAction(w.id, 'reject')}
@@ -511,7 +511,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 <p className="text-sm font-blacktext-stone-800">📥 DepositVerification</p>
                 <div className="flex gap-1">
                   {(['pending', 'approved', 'rejected', 'all'] asconst).map(f=> (
-                    <buttonkey={f}
+                    <button key={f}
                       onClick={() => setDepFilter(f)}
                       className={cn('rounded-full px-2 py-1 text-[9px] font-black uppercase', depFilter=== f? 'bg-red-600  text-white' :'bg-stone-100  text-stone-500')}
                     >
@@ -527,7 +527,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <GameCard><EmptyStateemoji="📥" title="No depositshere" sub="Player manual payments appear in thisqueue" /></GameCard>
             )}
             {deposits.map(d=> (
-              <GameCardkey={d.id} className={cn(d.status=== 'pending' && 'border-amber-300bg-amber-50/50')}>
+              <GameCard key={d.id} className={cn(d.status=== 'pending' && 'border-amber-300bg-amber-50/50')}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-blacktext-stone-800">{USD(d.amountCents)} → 🪙 {(d.coins+ d.bonusCoins).toLocaleString()}</p>
@@ -536,7 +536,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                     <p className="truncate text-[10px]text-stone-600">🔖 Ref:{d.reference}</p>
                     {d.bonusCoins> 0&& <p className="text-[10px] font-boldtext-green-700">Includes+{d.bonusCoins.toLocaleString()} bonuscoins</p>}
                     {d.note&& <p className="text-[10px]text-red-400">Note:{d.note}</p>}
-                    <p className="text-[9px]text-stone-600">{newDate(d.createdAt).toLocaleString()}{d.processedBy? ` · by${d.processedBy}` :''}</p>
+                    <p className="text-[9px]text-stone-600">{new Date(d.createdAt).toLocaleString()}{d.processedBy? ` · by${d.processedBy}` :''}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span className={cn(
@@ -557,12 +557,12 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 </div>
                 {d.proof&& d.proof.length< 400_000&& (
                   <button onClick={() => setProofView(d)} className="mt-2 block w-full">
-                    <imgsrc={d.proof} alt="Paymentproof" className="h-28 w-full rounded-lg border border-stone-200object-cover" />
+                    <img src={d.proof} alt="Paymentproof" className="h-28 w-full rounded-lg border border-stone-200object-cover" />
                   </button>
                 )}
                 {d.status=== 'pending' && (
                   <div className="mt-2 space-y-1.5">
-                    <Inputvalue={depNote} onChange={e=> setDepNote(e.target.value)} placeholder="Note on reject(optional, sent toplayer)" className="h-8 rounded-lg bg-stone-50  text-[11px]" />
+                    <Input value={depNote} onChange={e=> setDepNote(e.target.value)} placeholder="Note on reject(optional, sent toplayer)" className="h-8 rounded-lg bg-stone-50  text-[11px]" />
                     <div className="flex gap-1.5">
                       <Buttonsize="sm" disabled={busy} onClick={() => depAction(d.id, 'approve')}
                         className="h-8 flex-1 rounded-lg bg-green-600 text-[11px] font-extrabold text-white">
@@ -584,7 +584,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 {payDefs.map(def=> {
                   const acc= payMethods[def.key]?? { enabled: false}
                   return(
-                    <divkey={def.key} className={cn('rounded-xl borderp-2.5', acc.enabled? 'border-green-200bg-green-50/50' :'border-stone-200bg-stone-50')}>
+                    <div key={def.key} className={cn('rounded-xl borderp-2.5', acc.enabled? 'border-green-200bg-green-50/50' :'border-stone-200bg-stone-50')}>
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-blacktext-stone-700">{def.emoji} {def.name}</p>
                         <button onClick={() => setPayMethods(m=> ({ ...m, [def.key]:{ ...acc, enabled:!acc.enabled} }))}
@@ -596,9 +596,9 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                       </div>
                       <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                         {def.fields.map(f=> (
-                          <divkey={f.key}>
+                          <div key={f.key}>
                             <Label className="text-[9px] font-boldtext-stone-500">{f.label}</Label>
-                            <Inputvalue={String(acc[f.key]?? '')}
+                            <Input value={String(acc[f.key]?? '')}
                               onChange={e=> setPayMethods(m=> ({ ...m, [def.key]:{ ...acc, [f.key]: e.target.value} }))}
                               className="mt-0.5 h-8 rounded-lg border-stone-200 bg-white text-[11px]"
                               placeholder={f.placeholder}
@@ -656,9 +656,9 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <p className="mb-3 text-[11px]text-stone-500">Changes apply instantly across the wholeplatform.</p>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(config).map(([key, value]) => (
-                  <divkey={key}>
+                  <div key={key}>
                     <Label className="text-[10px] font-boldtext-stone-500">{key}</Label>
-                    <Inputtype="number"
+                    <Input type="number"
                       value={value}
                       onChange={e=> setConfig(c=> ({ ...c, [key]: e.target.value}))}
                       className="mt-0.5 h-9 rounded-lg border-stone-200 bg-stone-50  text-xs"
@@ -701,16 +701,16 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <p className="text-sm font-blacktext-stone-800">🎉 CreateEvent</p>
               <p className="text-[11px]text-stone-500">All farmers get notified when an event goeslive.</p>
               <div className="mt-2 space-y-2">
-                <Inputvalue={evName} onChange={e=> setEvName(e.target.value)} placeholder="Event name e.g.DoubleEggWeekend" className="h-9 rounded-lg bg-stone-50  text-xs" />
-                <Inputvalue={evDesc} onChange={e=> setEvDesc(e.target.value)} placeholder="Shortdescription" className="h-9 rounded-lg bg-stone-50  text-xs" />
+                <Input value={evName} onChange={e=> setEvName(e.target.value)} placeholder="Event name e.g.DoubleEggWeekend" className="h-9 rounded-lg bg-stone-50  text-xs" />
+                <Input value={evDesc} onChange={e=> setEvDesc(e.target.value)} placeholder="Shortdescription" className="h-9 rounded-lg bg-stone-50  text-xs" />
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <Label className="text-[10px] font-boldtext-stone-500">Multiplier% (100-500)</Label>
-                    <Inputtype="number" value={evMult} onChange={e=> setEvMult(e.target.value)} className="mt-0.5 h-9 rounded-lg bg-stone-50  text-xs" />
+                    <Input type="number" value={evMult} onChange={e=> setEvMult(e.target.value)} className="mt-0.5 h-9 rounded-lg bg-stone-50  text-xs" />
                   </div>
                   <div>
                     <Label className="text-[10px] font-boldtext-stone-500">Duration(days)</Label>
-                    <Inputtype="number" value={evDays} onChange={e=> setEvDays(e.target.value)} className="mt-0.5 h-9 rounded-lg bg-stone-50  text-xs" />
+                    <Input type="number" value={evDays} onChange={e=> setEvDays(e.target.value)} className="mt-0.5 h-9 rounded-lg bg-stone-50  text-xs" />
                   </div>
                 </div>
                 <Button onClick={createEvent} disabled={busy|| !evName} className="h-10 w-full rounded-xl bg-amber-800 font-extrabold text-white">
@@ -719,12 +719,12 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             </GameCard>
 
             {events.map(ev=> (
-              <GameCardkey={ev.id} className={cn(!ev.active&& 'opacity-60')}>
+              <GameCard key={ev.id} className={cn(!ev.active&& 'opacity-60')}>
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
                     <p className="text-sm font-blacktext-stone-800">{ev.name}</p>
                     <p className="text-[11px]text-stone-500">{ev.description}</p>
-                    <p className="mt-0.5 text-[10px] font-boldtext-amber-600">×{(ev.multiplier /100).toFixed(1)} · ends{newDate(ev.endsAt).toLocaleDateString()}</p>
+                    <p className="mt-0.5 text-[10px] font-boldtext-amber-600">×{(ev.multiplier /100).toFixed(1)} · ends{new Date(ev.endsAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex shrink-0 flex-colgap-1">
                     <span className={cn('rounded-full px-2 py-0.5 text-center text-[9px] font-black uppercase', ev.active? 'bg-green-100  text-green-700' :'bg-stone-200  text-stone-500')}>
@@ -751,8 +751,8 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <p className="text-sm font-blacktext-stone-800">📢 BroadcastNotification</p>
               <p className="text-[11px]text-stone-500">Sends an in-game alert to every farmerinstantly.</p>
               <div className="mt-2 space-y-2">
-                <Inputvalue={bcTitle} onChange={e=> setBcTitle(e.target.value)} placeholder="Title e.g.🎁 Free gemstoday!" className="h-9 rounded-lg bg-stone-50  text-xs" />
-                <textareavalue={bcMsg}
+                <Input value={bcTitle} onChange={e=> setBcTitle(e.target.value)} placeholder="Title e.g.🎁 Free gemstoday!" className="h-9 rounded-lg bg-stone-50  text-xs" />
+                <textarea value={bcMsg}
                   onChange={e=> setBcMsg(e.target.value)}
                   placeholder="Messagebody..."
                   rows={3}
@@ -784,15 +784,15 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             <GameCard>
               <p className="mb-2 text-xs font-blacktext-stone-700">👥 DailyActiveUsers(14d)</p>
               <div className="h-44">
-                <ResponsiveContainerwidth="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChartdata={analytics.dauSeries}>
                     <CartesianGridstrokeDasharray="33" stroke="#e7e5e4" />
                     <XAxisdataKey="date" tick={{ fontSize: 10}} />
                     <YAxistick={{ fontSize: 10}} allowDecimals={false} />
                     <TooltipcontentStyle={{ fontSize:12, borderRadius: 12}} />
                     <LegendwrapperStyle={{ fontSize: 9}} />
-                    <Linetype="monotone" dataKey="dau" stroke="#0d9488" strokeWidth={3} dot={{ r: 2}} name="DAU" />
-                    <Linetype="monotone" dataKey="newUsers" stroke="#16a34a" strokeWidth={2} dot={{ r: 2}} name="Newusers" />
+                    <Line type="monotone" dataKey="dau" stroke="#0d9488" strokeWidth={3} dot={{ r: 2}} name="DAU" />
+                    <Line type="monotone" dataKey="newUsers" stroke="#16a34a" strokeWidth={2} dot={{ r: 2}} name="Newusers" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -801,7 +801,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             <GameCard>
               <p className="mb-2 text-xs font-blacktext-stone-700">💰 CoinFlow:Generated vsSpent(14d)</p>
               <div className="h-44">
-                <ResponsiveContainerwidth="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChartdata={analytics.economySeries}>
                     <CartesianGridstrokeDasharray="33" stroke="#e7e5e4" />
                     <XAxisdataKey="date" tick={{ fontSize: 10}} />
@@ -820,7 +820,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <GameCard>
                 <p className="mb-2 text-xs font-blacktext-stone-700">💳 Revenue(14d, USD)</p>
                 <div className="h-40">
-                  <ResponsiveContainerwidth="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChartdata={analytics.revenueSeries}>
                       <CartesianGridstrokeDasharray="33" stroke="#e7e5e4" />
                       <XAxisdataKey="date" tick={{ fontSize: 9}} />
@@ -835,15 +835,15 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <GameCard>
                 <p className="mb-2 text-xs font-blacktext-stone-700">🥚 EggEconomy(14d)</p>
                 <div className="h-40">
-                  <ResponsiveContainerwidth="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChartdata={analytics.eggSeries}>
                       <CartesianGridstrokeDasharray="33" stroke="#e7e5e4" />
                       <XAxisdataKey="date" tick={{ fontSize: 9}} />
                       <YAxistick={{ fontSize: 10}} />
                       <TooltipcontentStyle={{ fontSize:12, borderRadius: 12}} />
                       <LegendwrapperStyle={{ fontSize: 9}} />
-                      <Linetype="monotone" dataKey="laid" stroke="#eab308" strokeWidth={2} dot={false} name="Laid" />
-                      <Linetype="monotone" dataKey="hatched" stroke="#f97316" strokeWidth={2} dot={false} name="Hatched" />
+                      <Line type="monotone" dataKey="laid" stroke="#eab308" strokeWidth={2} dot={false} name="Laid" />
+                      <Line type="monotone" dataKey="hatched" stroke="#f97316" strokeWidth={2} dot={false} name="Hatched" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -857,7 +857,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               ) :(
                 <div className="mt-2 space-y-1">
                   {analytics.topSpenders.map((s, i) => (
-                    <divkey={s.userId} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
+                    <div key={s.userId} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
                       <span className="font-blacktext-stone-600">{i+ 1}.@{s.username}</span>
                       <span className="font-boldtext-stone-500">{s.count} orders· <b className="text-pink-600">${(s.cents /100).toFixed(2)}</b></span>
                     </div>
@@ -872,7 +872,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 {analytics.revenueBySku.length=== 0? (
                   <p className="text-[11px]text-stone-600">No datayet.</p>
                 ) :analytics.revenueBySku.map(s=> (
-                  <divkey={s.sku} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
+                  <div key={s.sku} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
                     <span className="font-blacktext-stone-600">{s.sku}</span>
                     <span className="font-boldtext-stone-500">×{s.count} · ${(s.cents /100).toFixed(2)}</span>
                   </div>
@@ -909,12 +909,12 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 <p className="text-xs font-blacktext-red-700">🚩 FlaggedAccounts</p>
                 <div className="mt-2 space-y-1">
                   {security.flagged.map(f=> (
-                    <divkey={f.id} className="flex items-center justify-between rounded-lg bg-white px-2 py-1.5 text-[11px]">
+                    <div key={f.id} className="flex items-center justify-between rounded-lg bg-white px-2 py-1.5 text-[11px]">
                       <div className="min-w-0">
                         <p className="truncate font-blacktext-stone-700">{f.avatar} {f.farmName} <span className="font-normaltext-stone-600">@{f.username}</span></p>
                         <p className="truncate text-[10px]text-red-500">{f.flagReason}</p>
                       </div>
-                      <button onClick={async() => { awaituserAction(f.id, 'unflag'); loadSecurity() }}
+                      <button onClick={async() => { await userAction(f.id, 'unflag'); loadSecurity() }}
                         className="shrink-0 rounded-full bg-green-100 px-2 py-1 text-[9px] font-blacktext-green-700"
                       >
                         Clear flag</button>
@@ -929,7 +929,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <p className="text-[10px]text-stone-600">Assign roles in theUsers tab(SuperAdminonly).</p>
               <div className="mt-2 space-y-1">
                 {security.admins.map(a=> (
-                  <divkey={a.id} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
+                  <div key={a.id} className="flex items-center justify-between rounded-lg bg-stone-50 px-2 py-1.5 text-[11px]">
                     <span className="font-blacktext-stone-600">{a.farmName} <span className="font-normaltext-stone-600">@{a.username}</span></span>
                     <span className="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-blacktext-red-700">{a.roleLabel}</span>
                   </div>
@@ -944,7 +944,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               ) :(
                 <div className="mt-2 space-y-1">
                   {security.events.map(ev=> (
-                    <divkey={ev.id} className="rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
+                    <div key={ev.id} className="rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
                       <p className="font-blacktext-stone-600">
                         <span className={cn(
                           'mr-1 rounded px-1 py-0.5 text-[8px] font-black uppercase',
@@ -956,7 +956,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                         </span>
                         @{ev.username}
                       </p>
-                      <p className="text-stone-600">{ev.detail} · {newDate(ev.createdAt).toLocaleString()}</p>
+                      <p className="text-stone-600">{ev.detail} · {new Date(ev.createdAt).toLocaleString()}</p>
                     </div>
                   ))}
                 </div>
@@ -970,9 +970,9 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               ) :(
                 <div className="mt-2 space-y-1">
                   {security.logs.map(l=> (
-                    <divkey={l.id} className="rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
+                    <div key={l.id} className="rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
                       <p className="font-blacktext-stone-600">🛡️ {l.adminName} · {l.action}</p>
-                      <p className="text-stone-600">{l.detail} · {newDate(l.createdAt).toLocaleString()}</p>
+                      <p className="text-stone-600">{l.detail} · {new Date(l.createdAt).toLocaleString()}</p>
                     </div>
                   ))}
                 </div>
@@ -991,7 +991,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             </div>
 
             {miniGames.games.map(g=> (
-              <GameCardkey={g.id} className={cn(!g.enabled&& 'opacity-60')}>
+              <GameCard key={g.id} className={cn(!g.enabled&& 'opacity-60')}>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{g.emoji}</span>
                   <div className="min-w-0 flex-1">
@@ -1013,7 +1013,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 <div className="mt-2 flex items-end gap-1.5">
                   <div className="w-28">
                     <Label className="text-[9px] font-boldtext-stone-600">Entry cost(⚡ energy)</Label>
-                    <Inputtype="number" min={1} max={50} defaultValue={g.energyCost}
+                    <Input type="number" min={1} max={50} defaultValue={g.energyCost}
                       id={`cost-${g.id}`}
                       className="mt-0.5 h-8 rounded-lg bg-stone-50  text-xs"
                     />
@@ -1050,7 +1050,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 {miniGames.season.top3.length=== 0? (
                   <p className="text-[11px]text-stone-600">No arcade scores recorded this monthyet.</p>
                 ) :miniGames.season.top3.map(r=> (
-                  <divkey={r.userId} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-[11px]shadow-sm">
+                  <div key={r.userId} className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-[11px] shadow-sm">
                     <span>{['🥇', '🥈', '🥉'][r.rank -1]}</span>
                     <span>{r.avatar}</span>
                     <span className="flex-1 font-blacktext-stone-700">@{r.username}</span>
@@ -1067,11 +1067,11 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 <p className="text-xs font-blacktext-red-700">🚨 CheatMonitor— ImpossibleSessions</p>
                 <div className="mt-2 space-y-1">
                   {miniGames.cheated.map(c=> (
-                    <divkey={c.id} className="rounded-lg bg-white px-2 py-1.5 text-[10px]">
+                    <div key={c.id} className="rounded-lg bg-white px-2 py-1.5 text-[10px]">
                       <p className="font-blacktext-stone-600">
                         {c.gameKey=== 'chicken_run' ? '🏃' :'🚦'} @{c.username} {c.flagged&& <span className="rounded bg-amber-900 px-1 text-[8px] font-black text-white">🚩 FLAGGED</span>}
                       </p>
-                      <p className="text-stone-600">{newDate(c.createdAt).toLocaleString()}</p>
+                      <p className="text-stone-600">{new Date(c.createdAt).toLocaleString()}</p>
                     </div>
                   ))}
                 </div>
@@ -1083,7 +1083,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               <p className="text-xs font-blacktext-stone-700">🕹️ RecentSessions</p>
               <div className="mt-2 space-y-1">
                 {miniGames.recent.map(s=> (
-                  <divkey={s.id} className="flex items-center gap-2 rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
+                  <div key={s.id} className="flex items-center gap-2 rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
                     <span>{s.avatar}</span>
                     <span className="flex-1 truncate font-boldtext-stone-600">@{s.username}</span>
                     <span className="text-stone-600">{s.gameKey=== 'chicken_run' ? `${s.distance}m` :`${s.score} roads`}</span>
@@ -1113,7 +1113,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
 
             <div className="flex gap-1">
               {(['open', 'answered', 'closed'] asconst).map(f=> (
-                <buttonkey={f} onClick={() => setSupportFilter(f)}
+                <button key={f} onClick={() => setSupportFilter(f)}
                   className={cn('rounded-full px-3 py-1.5 text-[11px] font-extrabold capitalize',
                     supportFilter=== f? 'bg-red-600 text-white  shadow' :'bg-stone-100  text-stone-500')}>
                   {f}
@@ -1124,12 +1124,12 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
             {support.tickets.length=== 0? (
               <EmptyStateemoji="🎫" title={`No${supportFilter} tickets`} sub="Player tickets appear here in realtime" />
             ) :support.tickets.map(t=> (
-              <GameCardkey={t.id} className={cn(t.status=== 'open' && 'border-amber-300')}>
+              <GameCard key={t.id} className={cn(t.status=== 'open' && 'border-amber-300')}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-blacktext-stone-800">{t.subject}</p>
                     <p className="text-[10px]text-stone-600">
-                      @{t.username} · {t.category}{t.assignedTo? ` · assigned:${t.assignedTo}` :''} · {newDate(t.createdAt).toLocaleDateString()}
+                      @{t.username} · {t.category}{t.assignedTo? ` · assigned:${t.assignedTo}` :''} · {new Date(t.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <span className={cn(
@@ -1143,7 +1143,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 {/* thread*/}
                 <div className="mt-2 max-h-40 space-y-1.5 overflow-y-auto rounded-xl bg-stone-50  p-2">
                   {t.messages.map(m=> (
-                    <divkey={m.id} className={cn('flex', m.sender=== 'staff' ? 'justify-start' :'justify-end')}>
+                    <div key={m.id} className={cn('flex', m.sender=== 'staff' ? 'justify-start' :'justify-end')}>
                       <div className={cn(
                         'max-w-[85%] rounded-xl px-2 py-1.5 text-[10px]',
                         m.sender=== 'staff' ? 'bg-green-100' :'bg-stone-200'
@@ -1156,7 +1156,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
                 </div>
 
                 <div className="mt-2 flex gap-1.5">
-                  <Inputvalue={ticketReply[t.id]?? ''}
+                  <Input value={ticketReply[t.id]?? ''}
                     onChange={e=> setTicketReply(r=> ({ ...r, [t.id]: e.target.value}))}
                     placeholder="Reply asstaff..."
                     className="h-9 flex-1 rounded-lg bg-stone-50  text-xs"
@@ -1203,7 +1203,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
               Sender:{proofView.senderName} · Ref:{proofView.reference}
             </p>
             {proofView.proof? (
-              <imgsrc={proofView.proof} alt="Paymentproof" className="mt-2 w-full rounded-xl borderborder-stone-200" />
+              <img src={proofView.proof} alt="Paymentproof" className="mt-2 w-full rounded-xl borderborder-stone-200" />
             ) :(
               <p className="mt-2 rounded-lg bg-stone-50 px-3 py-4 text-center text-[11px] font-boldtext-stone-600">No proofattached</p>
             )}
@@ -1224,7 +1224,7 @@ constPIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855
   )
 }
 
-functionStatCard({ icon, label, value, tone, sub}:{ icon:string; label:string; value: number| string; tone:string; sub?: string}) {
+function StatCard({ icon, label, value, tone, sub}:{ icon:string; label:string; value: number| string; tone:string; sub?: string}) {
   const tones:Record<string, string> = {
     green:'from-green-50 to-whiteborder-green-200',
     teal:'from-teal-50 to-whiteborder-teal-200',
@@ -1244,11 +1244,11 @@ functionStatCard({ icon, label, value, tone, sub}:{ icon:string; label:string; v
   )
 }
 
-functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onAction:(id:string, action:string, extra?:Record<string, unknown>) => Promise<void>; onDone:() => void}) {
-  const[open, setOpen]= useState(false)
-  const[adjCoins, setAdjCoins]= useState('')
-  const[adjGems, setAdjGems]= useState('')
-  const[role, setRole]= useState<string>(u.adminRole?? (u.isAdmin? 'super' :'none'))
+function UserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onAction:(id:string, action:string, extra?:Record<string, unknown>) => Promise<void>; onDone:() => void}) {
+  const [open, setOpen]= useState(false)
+  const [adjCoins, setAdjCoins]= useState('')
+  const [adjGems, setAdjGems]= useState('')
+  const [role, setRole]= useState<string>(u.adminRole?? (u.isAdmin? 'super' :'none'))
 
   return(
     <GameCard className={cn(u.isBlocked&& 'border-red-200bg-red-50/40', u.flagged&& !u.isBlocked&& 'border-amber-400bg-amber-50/40')}>
@@ -1259,7 +1259,7 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
             {u.farmName} {u.isAdmin&& <span className="rounded bg-red-100 px-1 text-[9px] font-blacktext-red-600">{u.roleLabel?? 'ADMIN'}</span>}
             {u.isBlocked&& <span className="rounded bg-red-700 px-1 text-[9px] font-black text-white">BLOCKED</span>}
             {u.flagged&& !u.isBlocked&& <span className="rounded bg-amber-900 px-1 text-[9px] font-black text-white">🚩 FLAG</span>}
-            {u.vipActive&& <spantitle="VIP">👑</span>}
+            {u.vipActive&& <span title="VIP">👑</span>}
           </p>
           <p className="text-[10px]text-stone-600">@{u.username} · {u.levelName} (Lv{u.numericLevel}) · 🐔{u.hens} 🐄{u.animals} · CoopLv{u.coopLevel}</p>
         </div>
@@ -1272,7 +1272,7 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
       {open&& (
         <div className="mt-2 space-y-2 border-t border-stone-100pt-2">
           <p className="text-[9px]text-stone-600">
-            Joined{newDate(u.createdAt).toLocaleDateString()} · Last seen{newDate(u.lastSeenAt).toLocaleString()} · Ref:{u.referralCode} · Earned:🪙{u.totalEarned.toLocaleString()} · Eggs:{u.totalEggsHatch}
+            Joined{new Date(u.createdAt).toLocaleDateString()} · Last seen{new Date(u.lastSeenAt).toLocaleString()} · Ref:{u.referralCode} · Earned:🪙{u.totalEarned.toLocaleString()} · Eggs:{u.totalEggsHatch}
           </p>
           {u.flagged&& (
             <p className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-boldtext-amber-700">
@@ -1284,7 +1284,7 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
           <div className="flex items-end gap-1.5">
             <div className="flex-1">
               <Label className="text-[9px] font-boldtext-stone-600">Admin role(SuperAdminonly)</Label>
-              <selectvalue={role}
+              <select value={role}
                 onChange={e=> setRole(e.target.value)}
                 className="mt-0.5 h-8 w-full rounded-lg border border-stone-200 bg-stone-50 text-xs font-bold"
               >
@@ -1295,15 +1295,15 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
                 <optionvalue="support">SupportManager(users/broadcast)</option>
               </select>
             </div>
-            <buttondisabled={busy}
-              onClick={async() => { awaitonAction(u.id, 'set_role', { role}); onDone() }}
+            <button disabled={busy}
+              onClick={async() => { await onAction(u.id, 'set_role', { role}); onDone() }}
               className="h-8 rounded-lg bg-red-600 px-3 text-[10px] font-black text-white  disabled:opacity-40"
             >
               Set role</button>
           </div>
           <div className="flex flex-wrapgap-1.5">
             {!u.isAdmin&& (
-              <buttondisabled={busy}
+              <button disabled={busy}
                 onClick={() => onAction(u.id, u.isBlocked? 'unblock' :'block')}
                 className={cn(
                   'rounded-full px-3 py-1.5 text-[10px] font-black text-white',
@@ -1313,12 +1313,12 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
                 {u.isBlocked? '✅ Unblock' :'⛔ Block'}
               </button>
             )}
-            <buttondisabled={busy}
+            <button disabled={busy}
               onClick={() => onAction(u.id, 'grant_hen', { henType:'golden' })}
               className="rounded-full bg-amber-400 px-3 py-1.5 text-[10px] font-black text-white"
             >
               🐔 GiftGoldenHen</button>
-            <buttondisabled={busy}
+            <button disabled={busy}
               onClick={() => onAction(u.id, 'freeze_farm')}
               className="rounded-full bg-stone-200 px-3 py-1.5 text-[10px] font-blacktext-stone-600"
             >
@@ -1327,13 +1327,13 @@ functionUserRow({ u, busy, onAction, onDone}:{ u:AdminUser; busy:boolean; onActi
           <div className="flex items-end gap-1.5">
             <div className="flex-1">
               <Label className="text-[9px] font-boldtext-stone-600">Coins+/-</Label>
-              <Inputtype="number" value={adjCoins} onChange={e=> setAdjCoins(e.target.value)} className="h-8 rounded-lg bg-stone-50  text-xs" placeholder="e.g. 500 /-200" />
+              <Input type="number" value={adjCoins} onChange={e=> setAdjCoins(e.target.value)} className="h-8 rounded-lg bg-stone-50  text-xs" placeholder="e.g. 500 /-200" />
             </div>
             <div className="w-24">
               <Label className="text-[9px] font-boldtext-stone-600">Gems+/-</Label>
-              <Inputtype="number" value={adjGems} onChange={e=> setAdjGems(e.target.value)} className="h-8 rounded-lg bg-stone-50  text-xs" placeholder="e.g.5" />
+              <Input type="number" value={adjGems} onChange={e=> setAdjGems(e.target.value)} className="h-8 rounded-lg bg-stone-50  text-xs" placeholder="e.g.5" />
             </div>
-            <buttondisabled={busy|| (!adjCoins&& !adjGems)}
+            <button disabled={busy|| (!adjCoins&& !adjGems)}
               onClick={() => onAction(u.id, 'adjust', { coins:Number(adjCoins) || 0, gems:Number(adjGems) || 0})}
               className="h-8 rounded-lg bg-green-700 px-3 text-[10px] font-black text-white  disabled:opacity-40"
             >

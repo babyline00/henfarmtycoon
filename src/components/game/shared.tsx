@@ -1,8 +1,8 @@
-'useclient'
+'use client'
 
 import{ cn} from'@/lib/utils'
 
-export functionCoinPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' }) {
+export function CoinPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' }) {
   return(
     <div className={cn(
       'flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 font-boldtext-amber-800',
@@ -14,7 +14,7 @@ export functionCoinPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' 
   )
 }
 
-export functionGemPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' }) {
+export function GemPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' }) {
   return(
     <div className={cn(
       'flex items-center gap-1 rounded-full bg-pink-100 border border-pink-300 font-boldtext-pink-700',
@@ -26,16 +26,16 @@ export functionGemPill({ value, size= 'md' }:{ value:number; size?:'sm' | 'md' }
   )
 }
 
-export functionSectionTitle({ children, right}:{ children:React.ReactNode; right?:React.ReactNode}) {
+export function SectionTitle({ children, right}:{ children:React.ReactNode; right?:React.ReactNode}) {
   return(
     <div className="flex items-center justify-between mb-2 mt-4">
-      <h2className="text-sm font-extrabold uppercase tracking-widetext-stone-500">{children}</h2>
+      <h2 className="text-sm font-extrabold uppercase tracking-widetext-stone-500">{children}</h2>
       {right}
     </div>
   )
 }
 
-export functionProgressBar({ pct, label, className}:{ pct:number; label?:string; className?: string}) {
+export function ProgressBar({ pct, label, className}:{ pct:number; label?:string; className?: string}) {
   const clamped= Math.min(100, Math.max(0, pct))
   return(
     <div className={cn('h-2 w-full rounded-full bg-stone-200  overflow-hidden', className)}
@@ -61,7 +61,7 @@ constrarityStyles:Record<string, string> = {
   Legendary:'bg-amber-50 text-amber-700border-amber-400',
 }
 
-export functionRarityBadge({ rarity}:{ rarity: string}) {
+export function RarityBadge({ rarity}:{ rarity: string}) {
   return(
     <span className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-bold', rarityStyles[rarity]?? rarityStyles.Common)}>
       {rarity}
@@ -69,19 +69,19 @@ export functionRarityBadge({ rarity}:{ rarity: string}) {
   )
 }
 
-export functionGameCard({
+export function GameCard({
   children, className, onClick, expanded, label,
 }:{
-  children:React.ReactNodeclassName?: stringonClick?:() => voidexpanded?: booleanlabel?: string}) {
+  children:React.ReactNode; className?: string; onClick?:() => void; expanded?: boolean; label?: string}) {
   //Was a<divonClick>, so the ticket list and any other expandable card // were completely unreachable by keyboard.Only opt into button // semantics when it is actually interactive. if(!onClick) {
     return(
-      <div className={cn('rounded-2xl border border-stone-200/80 bg-white/95 p-3 shadow-smbackdrop-blur', className)}>
+      <div className={cn('rounded-2xl border border-stone-200/80 bg-white/95 p-3 shadow-sm backdrop-blur', className)}>
         {children}
       </div>
     )
   }
   return(
-    <divrole="button"
+    <div role="button"
       tabIndex={0}
       aria-expanded={expanded}
       aria-label={label}
@@ -101,17 +101,17 @@ export functionGameCard({
   )
 }
 
-export functionEmptyState({ emoji, title, sub}:{ emoji:string; title:string; sub?: string}) {
+export function EmptyState({ emoji, title, sub}:{ emoji:string; title:string; sub?: string}) {
   return(
     <div className="flex flex-col items-center justify-center py-10text-center">
-      <div className="text-5xlopacity-60" aria-hidden="true">{emoji}</div>
+      <div className="text-5xl opacity-60" aria-hidden="true">{emoji}</div>
       <p className="mt-3 font-boldtext-stone-600">{title}</p>
       {sub&& <p className="mt-1 text-xstext-stone-600">{sub}</p>}
     </div>
   )
 }
 
-export functionLoadingSpinner({ label= 'Loading...' }:{ label?: string}) {
+export function LoadingSpinner({ label= 'Loading...' }:{ label?: string}) {
   return(
     <div className="flex flex-col items-center justify-center py-16" role="status" aria-live="polite">
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-200 border-t-green-600motion-reduce:animate-none" aria-hidden="true" />
@@ -120,15 +120,15 @@ export functionLoadingSpinner({ label= 'Loading...' }:{ label?: string}) {
   )
 }
 
-export functionErrorState({
+export function ErrorState({
   title= 'Something wentwrong',
   message,
   onRetry,
 }:{
-  title?: stringmessage?: stringonRetry?:() => void}) {
+  title?: string; message?: string; onRetry?:() => void}) {
   //An important failure must never be reduced to a silent toastor, worse,
   // an endless"Loading..." row.This is the terminal state for a failed // fetch and it always offers a way forward. return(
-    <divrole="alert" className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 py-8text-center">
+    <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 py-8text-center">
       <div className="text-4xl" aria-hidden="true">⚠️</div>
       <p className="mt-3 text-sm font-boldtext-red-900">{title}</p>
       {message&& <p className="mt-1 max-w-xs text-xstext-red-800">{message}</p>}

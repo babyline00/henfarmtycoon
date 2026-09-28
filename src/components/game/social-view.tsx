@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useCallback, useEffect, useState} from'react'
 import{ AnimatePresence, motion} from'framer-motion'
@@ -10,38 +10,38 @@ import{ Label} from'@/components/ui/label'
 import{ GameCard, SectionTitle, EmptyState, ProgressBar, ErrorState, LoadingSpinner} from'./shared'
 import{ cn} from'@/lib/utils'
 
-interfaceFriendRow{
+interface FriendRow{
   userId:string; username:string; farmName:string; avatar: string level:number; vip:boolean; online:boolean; canGift: boolean direction:string; rowId: string}
-interfaceRequestRow{ rowId:string; userId:string; username:string; farmName:string; avatar: string}
-interfaceClanMemberRow{
+interface RequestRow{ rowId:string; userId:string; username:string; farmName:string; avatar: string}
+interface ClanMemberRow{
   userId:string; username:string; farmName:string; avatar: string role:string; contribution:number; joinedAt: string}
-interfaceClanView{
-  id:string; name:string; tag:string; emblem:string; description: string level:number; xp:number; nextLevelXp: number| null; treasury: numbermemberCap:number; weeklyReward: numbermyRole:string; myContribution:number; lastClaimAt: string| null members:ClanMemberRow[]}
-interfaceClanListRow{
+interface ClanView{
+  id:string; name:string; tag:string; emblem:string; description: string level:number; xp:number; nextLevelXp: number| null; treasury: number; memberCap:number; weeklyReward: number; myRole:string; myContribution:number; lastClaimAt: string| null members:ClanMemberRow[]}
+interface ClanListRow{
   id:string; rank:number; name:string; tag:string; emblem: string level:number; xp:number; treasury:number; memberCount:number; leaderName: string}
-interfaceSocialData{
+interface SocialData{
   friends:FriendRow[] requests:RequestRow[]sentPending:{ rowId:string; username:string; farmName: string}[]giftAmount: number clan:ClanView| nullclanList:ClanListRow[]}
-interfaceVisitData{
+interface VisitData{
   restricted: boolean user:{ id:string; username:string; farmName:string; avatar:string; levelName:number; xp?:number; coins?:number; gems?:number; lastSeenAt?: string}
   farm?:{ coopLevel:number; landLevel:number; storageLevel:number; shelterLevel:number; health: string}
   hensByType?:Record<string, number>
   animalsByType?:Record<string, number>
-  totalHens?:number; totalAnimals?: numberclan?:{ name:string; tag:string; emblem: string} | null}
+  totalHens?:number; totalAnimals?: number; clan?:{ name:string; tag:string; emblem: string} | null}
 
-constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '💎'] export functionSocialView() {
+const CLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '💎'] export function SocialView() {
   const{ state, act, loading, showFlash} = useGame()
-  const[data, setData]= useState<SocialData| null>(null)
-  const[tab, setTab]= useState<'friends' | 'clan'>('friends')
-  const[addName, setAddName]= useState('')
-  const[visit, setVisit]= useState<VisitData| null>(null)
-  const[clanForm, setClanForm]= useState(false)
-  const[clanName, setClanName]= useState('')
-  const[clanTag, setClanTag]= useState('')
-  const[clanEmblem, setClanEmblem]= useState('🛡️')
-  const[donateAmt, setDonateAmt]= useState('200')
-  const[reloadKey, setReloadKey]= useState(0)
+  const [data, setData]= useState<SocialData| null>(null)
+  const [tab, setTab]= useState<'friends' | 'clan'>('friends')
+  const [addName, setAddName]= useState('')
+  const [visit, setVisit]= useState<VisitData| null>(null)
+  const [clanForm, setClanForm]= useState(false)
+  const [clanName, setClanName]= useState('')
+  const [clanTag, setClanTag]= useState('')
+  const [clanEmblem, setClanEmblem]= useState('🛡️')
+  const [donateAmt, setDonateAmt]= useState('200')
+  const [reloadKey, setReloadKey]= useState(0)
 
-  const[loadError, setLoadError]= useState<string| null>(null)
+  const [loadError, setLoadError]= useState<string| null>(null)
 
   const reload= useCallback(() => setReloadKey(k=> k+ 1), [])
 
@@ -49,27 +49,27 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
     let cancelled= falseapi<SocialData>('/api/social')
       .then(d=> { if(!cancelled) { setData(d); setLoadError(null) } })
       .catch((e:unknown) => {
-        if(cancelled) returnsetLoadError(e instanceofError? e.message :'Could not load friends andclan')
+        if(cancelled) return setLoadError(e instanceof Error? e.message :'Could not load friends andclan')
       })
     return() => { cancelled= true}
   }, [reloadKey, state?.pendingFriendRequests])
 
-  if(!state) return null constmyId= state.user.id async functionhandleAdd() {
-    if(!addName.trim()) return const res= awaitact('friend_add', { username:addName.trim() })
+  if(!state) return null const myId= state.user.id async function handleAdd() {
+    if(!addName.trim()) return const res= await act('friend_add', { username:addName.trim() })
     if(res) { setAddName(''); reload() }
   }
 
-  async functionhandleVisit(userId:string) {
+  async function handleVisit(userId:string) {
     try{
-      const v= awaitapi<VisitData>(`/api/social?visit=${userId}`)
+      const v= await api<VisitData>(`/api/social?visit=${userId}`)
       setVisit(v)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Visitfailed', 'error')
+      showFlash(e instanceof Error? e.message :'Visitfailed', 'error')
     }
   }
 
-  async functionhandleCreateClan() {
-    const res= awaitact('clan_create', { name:clanName, tag:clanTag, emblem:clanEmblem})
+  async function handleCreateClan() {
+    const res= await act('clan_create', { name:clanName, tag:clanTag, emblem:clanEmblem})
     if(res) { setClanForm(false); setClanName(''); setClanTag(''); reload() }
   }
 
@@ -82,7 +82,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
 
       <div className="grid grid-cols-2 gap-1 rounded-2xl bg-stone-100  p-1">
         {(['friends', 'clan'] asconst).map(t=> (
-          <buttonkey={t}
+          <button key={t}
             onClick={() => setTab(t)}
             className={cn(
               'relative rounded-xl py-2 text-xs font-extrabold transition-all',
@@ -101,7 +101,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
 
       {loadError? (
         <GameCard>
-          <ErrorStatetitle="Couldn't load friends& clan" message={loadError} onRetry={reload} />
+          <ErrorState title="Couldn't load friends& clan" message={loadError} onRetry={reload} />
         </GameCard>
       ) :!data? (
         <GameCard>
@@ -114,7 +114,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
             <p className="text-sm font-blacktext-stone-800">➕ Add aFriend</p>
             <p className="text-[11px]text-stone-500">Search by username— e.g. invite<b>demo</b> or a buddy to farmtogether.</p>
             <div className="mt-2 flex gap-2">
-              <Inputvalue={addName}
+              <Input value={addName}
                 onChange={e=> setAddName(e.target.value)}
                 placeholder="username…"
                 className="h-9 rounded-xlbg-stone-50"
@@ -130,20 +130,20 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
           {/* pending requests*/}
           {data.requests.length> 0&& (
             <>
-              <SectionTitle>📨 FriendRequests</SectionTitle>
+              <Secti onTitle>📨 FriendRequests</SectionTitle>
               <div className="space-y-2">
                 {data.requests.map(r=> (
-                  <GameCardkey={r.rowId} className="flex items-center gap-2">
+                  <GameCard key={r.rowId} className="flex items-center gap-2">
                     <span className="text-2xl">{r.avatar}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-blacktext-stone-800">{r.farmName}</p>
                       <p className="text-[10px]text-stone-600">@{r.username}</p>
                     </div>
-                    <Buttonsize="sm" onClick={async() => { awaitact('friend_accept', { requestId:r.rowId}); reload() }}
+                    <Buttonsize="sm" onClick={async() => { await act('friend_accept', { requestId:r.rowId}); reload() }}
                       className="h-8 rounded-full bg-emerald-700 px-3 text-xs font-extrabold text-white"
                     >
                       Accept</Button>
-                    <Buttonsize="sm" variant="outline" onClick={async() => { awaitact('friend_reject', { requestId:r.rowId}); reload() }}
+                    <Buttonsize="sm" var iant="outline" onClick={async() => { await act('friend_reject', { requestId:r.rowId}); reload() }}
                       className="h-8 rounded-full px-3 text-xs font-bold"
                     >
                       ✕
@@ -155,20 +155,20 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
           )}
 
           {/* friends list*/}
-          <SectionTitle>🌾 MyFriends({data.friends.length})</SectionTitle>
+          <Secti onTitle>🌾 MyFriends({data.friends.length})</SectionTitle>
           {data.friends.length=== 0? (
             <GameCard><EmptyStateemoji="🤝" title="No friendsyet" sub="Add a farmer above— try username:demo" /></GameCard>
           ) :(
             <div className="space-y-2">
               {data.friends.map(f=> (
-                <GameCardkey={f.userId} className="flex items-center gap-2">
+                <GameCard key={f.userId} className="flex items-center gap-2">
                   <div className="relative">
                     <span className="text-2xl">{f.avatar}</span>
                     {f.online&& <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-whitebg-green-500" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-blacktext-stone-800">
-                      {f.farmName} {f.vip&& <spantitle="VIP">👑</span>}
+                      {f.farmName} {f.vip&& <span title="VIP">👑</span>}
                     </p>
                     <p className="text-[10px]text-stone-600">@{f.username} · ⭐ Lv{f.level}</p>
                   </div>
@@ -177,12 +177,12 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                       className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-blacktext-stone-600"
                     >
                       👀 Visit</button>
-                    <button onClick={async() => { awaitact('gift_friend', { friendUserId:f.userId}); reload() }}
+                    <button onClick={async() => { await act('gift_friend', { friendUserId:f.userId}); reload() }}
                       disabled={loading|| !f.canGift}
                       className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-900disabled:opacity-40"
                     >
                       🎁 Gift</button>
-                    <button onClick={async() => { awaitact('help_friend', { friendUserId:f.userId}) }}
+                    <button onClick={async() => { await act('help_friend', { friendUserId:f.userId}) }}
                       disabled={loading}
                       className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700disabled:opacity-40"
                     >
@@ -206,7 +206,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
             <>
               <GameCard className="bg-gradient-to-r from-purple-50to-white">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-purple-200 bg-white text-3xlshadow">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-purple-200 bg-white text-3xl shadow">
                     {data.clan.emblem}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -242,13 +242,13 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                 </div>
                 <div className="mt-3 flex gap-2">
                   <Buttonsize="sm"
-                    onClick={async() => { awaitact('clan_claim'); reload() }}
+                    onClick={async() => { await act('clan_claim'); reload() }}
                     disabled={loading}
                     className="h-9 flex-1 rounded-xl bg-purple-700 text-xs font-extrabold text-white"
                   >
                     🎁 ClaimWeekly</Button>
-                  <Buttonsize="sm" variant="outline"
-                    onClick={async() => { awaitact('clan_leave'); reload() }}
+                  <Buttonsize="sm" var iant="outline"
+                    onClick={async() => { await act('clan_leave'); reload() }}
                     disabled={loading}
                     className="h-9 rounded-xl px-3 text-xs font-bold"
                   >
@@ -257,13 +257,13 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                 <div className="mt-2 flex items-end gap-2">
                   <div className="flex-1">
                     <Label className="text-[10px] font-boldtext-stone-600">Donate to treasury(min50)</Label>
-                    <Inputtype="number" value={donateAmt} min={50}
+                    <Input type="number" value={donateAmt} min={50}
                       onChange={e=> setDonateAmt(e.target.value)}
                       className="mt-1 h-9 rounded-xlbg-stone-50"
                     />
                   </div>
                   <Buttonsize="sm"
-                    onClick={async() => { awaitact('clan_donate', { amount:Number(donateAmt) }); reload() }}
+                    onClick={async() => { await act('clan_donate', { amount:Number(donateAmt) }); reload() }}
                     disabled={loading|| !Number(donateAmt) || Number(donateAmt) < 50}
                     className="h-9 rounded-xl bg-amber-800 px-4 text-xs font-extrabold text-white"
                   >
@@ -271,10 +271,10 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                 </div>
               </GameCard>
 
-              <SectionTitle>👥 ClanMembers</SectionTitle>
+              <Secti onTitle>👥 ClanMembers</SectionTitle>
               <div className="space-y-1.5">
                 {data.clan.members.map(m=> (
-                  <GameCardkey={m.userId} className="flex items-center gap-2 py-2">
+                  <GameCard key={m.userId} className="flex items-center gap-2 py-2">
                     <span className="text-xl">{m.avatar}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-blacktext-stone-800">
@@ -311,23 +311,23 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
               </Button>
               <AnimatePresence>
                 {clanForm&& (
-                  <motion.divinitial={{ height:0, opacity: 0}} animate={{ height:'auto', opacity: 1}} exit={{ height:0, opacity: 0}}
+                  <motion.div initial={{ height:0, opacity: 0}} animate={{ height:'auto', opacity: 1}} exit={{ height:0, opacity: 0}}
                     className="overflow-hidden"
                   >
                     <div className="mt-3 space-y-2">
                       <div>
                         <Label className="text-[10px] font-boldtext-stone-500">Clan name(3-24chars)</Label>
-                        <Inputvalue={clanName} onChange={e=> setClanName(e.target.value)} className="mt-1 h-9 rounded-xlbg-stone-50" placeholder="GoldenFarmers" />
+                        <Input value={clanName} onChange={e=> setClanName(e.target.value)} className="mt-1 h-9 rounded-xlbg-stone-50" placeholder="GoldenFarmers" />
                       </div>
                       <div>
                         <Label className="text-[10px] font-boldtext-stone-500">Tag(2-4chars)</Label>
-                        <Inputvalue={clanTag} onChange={e=> setClanTag(e.target.value.toUpperCase())} className="mt-1 h-9 rounded-xlbg-stone-50" placeholder="GFC" maxLength={4} />
+                        <Input value={clanTag} onChange={e=> setClanTag(e.target.value.toUpperCase())} className="mt-1 h-9 rounded-xlbg-stone-50" placeholder="GFC" maxLength={4} />
                       </div>
                       <div>
                         <Label className="text-[10px] font-boldtext-stone-500">Emblem</Label>
                         <div className="mt-1 flex flex-wrapgap-1">
                           {CLAN_EMBLEMS.map(e=> (
-                            <buttonkey={e}
+                            <button key={e}
                               onClick={() => setClanEmblem(e)}
                               className={cn(
                                 'h-9 w-9 rounded-xl bordertext-lg',
@@ -353,12 +353,12 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
           )}
 
           {/* clan leaderboard*/}
-          <SectionTitle>🏆 ClanLeaderboard</SectionTitle>
+          <Secti onTitle>🏆 ClanLeaderboard</SectionTitle>
           <div className="space-y-1.5">
             {data.clanList.length=== 0? (
               <GameCard><EmptyStateemoji="🛡️" title="No clansyet" sub="Be the first to foundone!" /></GameCard>
             ) :data.clanList.map(c=> (
-              <GameCardkey={c.id} className={cn('flex items-center gap-2 py-2.5', data.clan?.id=== c.id&& 'border-purple-400bg-purple-50')}>
+              <GameCard key={c.id} className={cn('flex items-center gap-2 py-2.5', data.clan?.id=== c.id&& 'border-purple-400bg-purple-50')}>
                 <span className={cn(
                   'w-7 text-center text-sm font-black',
                   c.rank=== 1? 'text-amber-500' : c.rank=== 2? 'text-stone-600' : c.rank=== 3? 'text-orange-700' :'text-stone-600'
@@ -375,7 +375,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                 <div className="shrink-0text-right">
                   <p className="text-xs font-black tabular-numstext-purple-700">⭐ {c.xp.toLocaleString()}</p>
                   {data.clan?.id!== c.id&& (
-                    <button onClick={async() => { awaitact('clan_join', { clanId: c.id}); reload() }}
+                    <button onClick={async() => { await act('clan_join', { clanId: c.id}); reload() }}
                       disabled={loading|| !!data.clan}
                       className="mt-0.5 rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-black text-purple-700disabled:opacity-40"
                     >
@@ -391,17 +391,17 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
       {/* ── farm visit modal── */}
       <AnimatePresence>
         {visit&& (
-          <motion.divinitial={{ opacity: 0}} animate={{ opacity: 1}} exit={{ opacity: 0}}
+          <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}} exit={{ opacity: 0}}
             className="fixed inset-0 z-50 flex items-end justify-centerbg-black/50"
             onClick={() => setVisit(null)}
           >
-            <motion.divinitial={{ y: 160}} animate={{ y: 0}} exit={{ y: 160}}
+            <motion.div initial={{ y: 160}} animate={{ y: 0}} exit={{ y: 160}}
               onClick={e=> e.stopPropagation()}
               className="max-h-[80dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5shadow-2xl"
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded-fullbg-stone-300" />
               <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-300 bg-amber-50 text-3xlshadow">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-300 bg-amber-50 text-3xl shadow">
                   {visit.user.avatar}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -428,7 +428,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                       <p className="text-[10px] font-black uppercasetext-stone-600">Theirflock</p>
                       <div className="mt-1 flex flex-wrapgap-1.5">
                         {Object.entries(visit.hensByType).map(([t, n]) => (
-                          <spankey={t} className="rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] font-boldtext-stone-600">
+                          <span key={t} className="rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] font-boldtext-stone-600">
                             {HEN_TYPES[t]?.emoji?? '🐔'} {HEN_TYPES[t]?.name?? t} ×{n}
                           </span>
                         ))}
@@ -440,7 +440,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
                       <p className="text-[10px] font-black uppercasetext-stone-600">Theiranimals</p>
                       <div className="mt-1 flex flex-wrapgap-1.5">
                         {Object.entries(visit.animalsByType).map(([t, n]) => (
-                          <spankey={t} className="rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] font-boldtext-stone-600">
+                          <span key={t} className="rounded-full border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] font-boldtext-stone-600">
                             {ANIMAL_TYPES[t]?.emoji?? '🐄'} {ANIMAL_TYPES[t]?.name?? t} ×{n}
                           </span>
                         ))}
@@ -451,7 +451,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
               )}
 
               <Button onClick={() => setVisit(null)}
-                variant="outline"
+                var iant="outline"
                 className="mt-4 h-11 w-full rounded-2xl text-sm font-bold"
               >
                 Close</Button>
@@ -463,7 +463,7 @@ constCLAN_EMBLEMS = ['🛡️', '🐔', '👑', '🌾', '🔥', '⭐', '🦅', '
   )
 }
 
-functionVisitStat({ icon, label, value}:{ icon:string; label:string; value: string}) {
+function VisitStat({ icon, label, value}:{ icon:string; label:string; value: string}) {
   return(
     <div className="rounded-xl border border-stone-200 bg-stone-50  py-1.5">
       <p className="text-sm">{icon}</p>

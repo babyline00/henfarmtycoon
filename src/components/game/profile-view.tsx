@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useCallback, useEffect, useState} from'react'
 import{ useGame, api} from'@/lib/store'
@@ -9,36 +9,36 @@ import{ SupportCenter} from'./support-center'
 import{ WalletView} from'./wallet-view'
 import{ cn} from'@/lib/utils'
 
-interfaceTx{
+interface Tx{
   id:string; type:string; amount:number; currency: string description:string; createdAt: string}
-interfaceNotif{ id:string; title:string; body:string; read:boolean; createdAt: string}
+interface Notif{ id:string; title:string; body:string; read:boolean; createdAt: string}
 
-constMONEY_TYPES = newSet(['deposit', 'withdraw', 'refund', 'purchase', 'vip'])
+const MONEY_TYPES = new Set(['deposit', 'withdraw', 'refund', 'purchase', 'vip'])
 
-export functionProfileView() {
+export function ProfileView() {
   const{ state, act, loading, logout, setAdminOpen, showFlash, refresh} = useGame()
-  const[tab, setTab]= useState<'wallet' | 'txs' | 'notifs' | 'support'>('wallet')
-  const[txs, setTxs]= useState<Tx[]>([])
-  const[txFilter, setTxFilter]= useState<'all' | 'money' | 'gameplay'>('all')
-  const[notifs, setNotifs]= useState<Notif[]>([])
-  const[gemQty, setGemQty]= useState(1)
-  const[reloadKey, setReloadKey]= useState(0)
+  const [tab, setTab]= useState<'wallet' | 'txs' | 'notifs' | 'support'>('wallet')
+  const [txs, setTxs]= useState<Tx[]>([])
+  const [txFilter, setTxFilter]= useState<'all' | 'money' | 'gameplay'>('all')
+  const [notifs, setNotifs]= useState<Notif[]>([])
+  const [gemQty, setGemQty]= useState(1)
+  const [reloadKey, setReloadKey]= useState(0)
   //History silently failing to load left empty lists with noexplanation,
   // so a player could not tell"no transactionsyet" from"requestfailed". const[histError, setHistError]= useState<string| null>(null)
-  const[histLoading, setHistLoading]= useState(false)
+  const [histLoading, setHistLoading]= useState(false)
 
   useEffect(() => {
     if(!state) return let cancelled= falsesetHistLoading(true)
     ;(async() => {
       try{
-        const[wallet, notes]= awaitPromise.all([api<{ transactions:Tx[]}>('/api/wallet'),
+        const [wallet, notes]= await Promise.all([api<{ transactions:Tx[]}>('/api/wallet'),
           api<{ notifications:Notif[]}>('/api/notifications'),
         ])
-        if(cancelled) returnsetTxs(wallet.transactions)
+        if(cancelled) return setTxs(wallet.transactions)
         setNotifs(notes.notifications)
         setHistError(null)
       } catch(e) {
-        if(cancelled) returnsetHistError(e instanceofError? e.message :'Could not load yourhistory')
+        if(cancelled) return setHistError(e instanceof Error? e.message :'Could not load yourhistory')
       } finally{
         if(!cancelled) setHistLoading(false)
       }
@@ -48,15 +48,15 @@ export functionProfileView() {
 
   const reload= useCallback(() => setReloadKey(k=> k+ 1), [])
 
-  if(!state) return null const{ user, config} = state async functionhandleExchange() {
-    const res= awaitact('exchange_gems', { gems:gemQty})
+  if(!state) return null const{ user, config} = state async function handleExchange() {
+    const res= await act('exchange_gems', { gems:gemQty})
     if(res) reload()
   }
 
-  async functionmarkRead() {
-    awaitapi('/api/notifications', { method:'POST', body:{ action:'mark_read' } })
+  async function markRead() {
+    await api('/api/notifications', { method:'POST', body:{ action:'mark_read' } })
     showFlash('All notifications marked asread')
-    awaitrefresh()
+    await refresh()
     reload()
   }
 
@@ -65,16 +65,16 @@ export functionProfileView() {
       {/* ── profile card── */}
       <GameCard className="bg-gradient-to-r from-green-50to-lime-50">
         <div className="flex items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-300 bg-white text-3xlshadow">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-300 bg-white text-3xl shadow">
             {user.avatar}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-blacktext-stone-800">
-              {user.farmName} {user.vip&& <spantitle="VIP member">👑</span>}
+              {user.farmName} {user.vip&& <span title="VIP member">👑</span>}
             </p>
             <p className="text-xstext-stone-500">@{user.username} · ⭐ {user.levelName} · Lv{user.numericLevel}</p>
             <p className="mt-0.5 text-[10px]text-stone-600">
-              Joined{newDate(user.createdAt).toLocaleDateString()} · Referral code:<b className="text-green-700">{user.referralCode}</b>
+              Joined{new Date(user.createdAt).toLocaleDateString()} · Referral code:<b className="text-green-700">{user.referralCode}</b>
             </p>
           </div>
         </div>
@@ -94,12 +94,12 @@ export functionProfileView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-blacktext-stone-800">👑 {user.vip.name} Active</p>
-              <p className="text-[11px]text-stone-500">Until{newDate(user.vip.until).toLocaleDateString()} · 💎 {user.vip.dailyGems}/dayclaimable</p>
+              <p className="text-[11px]text-stone-500">Until{new Date(user.vip.until).toLocaleDateString()} · 💎 {user.vip.dailyGems}/dayclaimable</p>
             </div>
             <Buttonsize="sm"
               onClick={() => act('claim_vip_daily')}
               disabled={loading|| !user.vip?.canClaimGems}
-              className="h-9 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-4 text-xs font-extrabold text-white shadow active:scale-95disabled:opacity-40"
+              className="h-9 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-4 text-xs font-extrabold text-white shadow active:scale-95 disabled:opacity-40"
             >
               {user.vip.canClaimGems? `Claim💎 ${user.vip.dailyGems}` :'✓ Claimed'}
             </Button>
@@ -121,7 +121,7 @@ export functionProfileView() {
       )}
 
       {/* ── level milestone rewards(Phase9) ── */}
-      <SectionTitleright={
+      <Secti onTitleright={
         user.claimableLevelRewards> 0? (
           <Buttonsize="sm"
             onClick={() => act('claim_level_reward')}
@@ -134,7 +134,7 @@ export functionProfileView() {
         ⭐ LevelMilestones</SectionTitle>
       <div className="space-y-1.5">
         {user.levelRewards.map(rw=> (
-          <GameCardkey={rw.level} className={cn(
+          <GameCard key={rw.level} className={cn(
             'flex items-center gap-2 py-2',
             rw.reached&& !rw.claimed&& 'border-purple-400bg-purple-50/50'
           )}>
@@ -170,7 +170,7 @@ export functionProfileView() {
       {/* ── tabs── */}
       <div className="grid grid-cols-4 gap-1 rounded-2xl bg-stone-100  p-1">
         {(['wallet', 'txs', 'notifs', 'support'] asconst).map(t=> (
-          <buttonkey={t}
+          <button key={t}
             onClick={() => setTab(t)}
             className={cn(
               'relative rounded-xl py-2 text-xs font-extrabold transition-all',
@@ -197,7 +197,7 @@ export functionProfileView() {
             <p className="text-sm font-blacktext-stone-800">💎 GemExchange</p>
             <p className="text-[11px]text-stone-500">1 gem= 🪙 {config.gemToCoins} coins</p>
             <div className="mt-2 flex items-center gap-2">
-              <inputtype="range" min={1} max={Math.max(1, user.gems)} value={gemQty}
+              <input type="range" min={1} max={Math.max(1, user.gems)} value={gemQty}
                 onChange={e=> setGemQty(Number(e.target.value))}
                 className="h-2 flex-1accent-pink-500"
               />
@@ -216,7 +216,7 @@ export functionProfileView() {
       {tab=== 'txs' && (
         histError? (
           <GameCard>
-            <ErrorStatetitle="Couldn't load yourhistory" message={histError} onRetry={() => reload()} />
+            <ErrorState title="Couldn't load yourhistory" message={histError} onRetry={() => reload()} />
           </GameCard>
         ) :histLoading&& txs.length=== 0? (
           <GameCard><LoadingSpinnerlabel="Loadinghistory..." /></GameCard>
@@ -226,7 +226,7 @@ export functionProfileView() {
           <div className="space-y-1.5">
             <div className="grid grid-cols-3 gap-1 rounded-xl bg-stone-100  p-1">
               {([['all', '🗂️ All'], ['money', '💰 Money'], ['gameplay', '🎮 Gameplay']] asconst).map(([f, label]) => (
-                <buttonkey={f}
+                <button key={f}
                   onClick={() => setTxFilter(f)}
                   className={cn('rounded-lg py-1.5 text-[10px] font-extrabold', txFilter=== f? 'bg-white text-green-700shadow' :'text-stone-600')}
                 >
@@ -236,11 +236,11 @@ export functionProfileView() {
             </div>
             {txs.filter(t=> txFilter=== 'all' || (txFilter=== 'money' ? MONEY_TYPES.has(t.type) :!MONEY_TYPES.has(t.type)))
               .map(t=> (
-              <GameCardkey={t.id} className="flex items-center gap-2 py-2">
+              <GameCard key={t.id} className="flex items-center gap-2 py-2">
                 <span className="text-lg">{txIcon(t.type)}</span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-boldtext-stone-700">{t.description}</p>
-                  <p className="text-[9px]text-stone-600">{newDate(t.createdAt).toLocaleString()}</p>
+                  <p className="text-[9px]text-stone-600">{new Date(t.createdAt).toLocaleString()}</p>
                 </div>
                 <span className={cn(
                   'shrink-0 text-xs font-black tabular-nums',
@@ -258,7 +258,7 @@ export functionProfileView() {
       {tab=== 'notifs' && (
         histError? (
           <GameCard>
-            <ErrorStatetitle="Couldn't loadnotifications" message={histError} onRetry={() => reload()} />
+            <ErrorState title="Couldn't loadnotifications" message={histError} onRetry={() => reload()} />
           </GameCard>
         ) :histLoading&& notifs.length=== 0? (
           <GameCard><LoadingSpinnerlabel="Loadingnotifications..." /></GameCard>
@@ -267,15 +267,15 @@ export functionProfileView() {
         ) :(
           <div className="space-y-2">
             {state.unreadNotifs> 0&& (
-              <Buttonsize="sm" variant="outline" onClick={markRead} className="h-8 w-full rounded-full text-xs font-bold">
+              <Buttonsize="sm" var iant="outline" onClick={markRead} className="h-8 w-full rounded-full text-xs font-bold">
                 Mark all as read({state.unreadNotifs})
               </Button>
             )}
             {notifs.map(n=> (
-              <GameCardkey={n.id} className={cn('py-2.5', !n.read&& 'border-l-4 border-l-green-500bg-green-50/40')}>
+              <GameCard key={n.id} className={cn('py-2.5', !n.read&& 'border-l-4 border-l-green-500bg-green-50/40')}>
                 <p className="text-xs font-blacktext-stone-800">{n.title}</p>
                 <p className="mt-0.5 text-[11px] leading-snugtext-stone-500">{n.body}</p>
-                <p className="mt-1 text-[9px]text-stone-600">{newDate(n.createdAt).toLocaleString()}</p>
+                <p className="mt-1 text-[9px]text-stone-600">{new Date(n.createdAt).toLocaleString()}</p>
               </GameCard>
             ))}
           </div>
@@ -286,7 +286,7 @@ export functionProfileView() {
       {tab=== 'support' && <SupportCenter/>}
 
       {/* ── actions── */}
-      <SectionTitle>⚙️ Account</SectionTitle>
+      <Secti onTitle>⚙️ Account</SectionTitle>
       {user.isAdmin&& (
         <Button onClick={() => setAdminOpen(true)}
           className="h-12 w-full rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 text-sm font-extrabold text-white shadow-lgactive:scale-[0.98]"
@@ -294,7 +294,7 @@ export functionProfileView() {
           🛡️ OpenSuperAdminPanel</Button>
       )}
       <Button onClick={logout}
-        variant="outline"
+        var iant="outline"
         className="h-11 w-full rounded-2xl border-stone-300 text-sm font-boldtext-stone-600"
       >
         🚪 Logout</Button>
@@ -303,7 +303,7 @@ export functionProfileView() {
   )
 }
 
-functiontxIcon(type:string): string{
+function txIcon(type:string): string{
   const map:Record<string, string> = {
     buy:'🛒', sell:'💰', production:'🥚', daily:'🎁', mission:'🎯',
     referral:'👥', admin:'🛡️', withdraw:'💸', refund:'↩️', exchange:'🔁',

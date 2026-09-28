@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useEffect, useRef, useState} from'react'
 import{ AnimatePresence, motion} from'framer-motion'
@@ -16,19 +16,19 @@ import{ AdminPanel} from'@/components/game/admin-panel'
 import{ LoadingSpinner} from'@/components/game/shared'
 import{ cn} from'@/lib/utils'
 
-typeView= 'farm' | 'games' | 'shop' | 'market' | 'social' | 'quests' | 'profile'
+type View= 'farm' | 'games' | 'shop' | 'market' | 'social' | 'quests' | 'profile'
 
-constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡', label:'Farm' },
+const NAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡', label:'Farm' },
   { key:'games', emoji:'🎮', label:'Games' },
   { key:'shop', emoji:'🛒', label:'Shop' },
   { key:'market', emoji:'🏪', label:'Market' },
   { key:'social', emoji:'🤝', label:'Social' },
   { key:'quests', emoji:'🎯', label:'Quests' },
   { key:'profile', emoji:'👤', label:'Me' },
-] export default functionPage() {
+] export default function Page() {
   const{ state, booting, boot, refresh, flash, hatchResult, setHatchResult, adminOpen, showFlash, bootError, retryBoot, clearBootError} = useGame()
-  const[view, setView]= useState<View>('farm')
-  constlastUnreadRef= useRef<number| null>(null)
+  const [view, setView]= useState<View>('farm')
+  const lastUnreadRef= useRef<number| null>(null)
 
   useEffect(() => { boot() }, [boot])
 
@@ -62,7 +62,7 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
       <div className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-lime-50 to-green-100px-6">
         <div className="w-full max-w-sm rounded-2xl border border-stone-200 bg-white p-6 text-centershadow-xl">
           <div className="text-5xl" aria-hidden="true">📡</div>
-          <h1className="mt-3 text-lg font-blacktext-stone-800">Can&apos;t reach yourfarm</h1>
+          <h1 className="mt-3 text-lg font-blacktext-stone-800">Can&apos;t reach yourfarm</h1>
           <prole="alert" className="mt-2 text-smtext-stone-600">{bootError}</p>
           <div className="mt-5 flex flex-colgap-2">
             <button onClick={() => retryBoot()}
@@ -86,13 +86,13 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
     return(
       <div className="flex min-h-dvh flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-lime-100 px-6text-center">
         <div className="text-7xl">🚜</div>
-        <h1className="mt-4 text-2xl font-blacktext-stone-800">FarmUnderMaintenance</h1>
+        <h1 className="mt-4 text-2xl font-blacktext-stone-800">FarmUnderMaintenance</h1>
         <p className="mt-2 text-smtext-stone-500">{state.config.maintenanceMode? 'The barn is being cleaned and upgraded.Come backsoon!' :''}</p>
       </div>
     )
   }
 
-  constreadyEggs= state.incubators.filter(i=> i.ready).length const claimable= state.missions.filter(m=> m.complete&& !m.claimed).length constcanDaily= state.user.canClaimDaily constsocialBadge= state.pendingFriendRequests+ state.user.claimableLevelRewards return(
+  const readyEggs= state.incubators.filter(i=> i.ready).length const claimable= state.missions.filter(m=> m.complete&& !m.claimed).length const canDaily= state.user.canClaimDaily const socialBadge= state.pendingFriendRequests+ state.user.claimableLevelRewards return(
     <div className="min-h-dvhbg-stone-200">
       <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-gradient-to-b from-lime-50 via-amber-50/40 to-green-50shadow-2xl">
 
@@ -118,7 +118,7 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
                 aria-label={state.unreadNotifs> 0? `Openprofile, ${state.unreadNotifs} unreadnotification${state.unreadNotifs=== 1? '' :'s'}`
                   :'Open profile andalerts'}
               >
-                <spanaria-hidden="true">🔔</span>
+                <span aria-hidden="true">🔔</span>
                 {state.unreadNotifs> 0&& (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-700 px-1 text-[8px] font-black text-white">
                     {state.unreadNotifs}
@@ -132,7 +132,7 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
         {/* ── content── */}
         <main className="flex-1 pb-24 pt-2">
           {/* The authenticated shell had no h1 atall, so assistive tech saw a flat run of section headings with no page boundary.*/}
-          <h1className="sr-only">{state.user.farmName} — HenFarmTycoon</h1>
+          <h1 className="sr-only">{state.user.farmName} — HenFarmTycoon</h1>
           <AnimatePresencemode="wait">
             <motion.divkey={view}
               initial={{ opacity:0, y: 8}}
@@ -152,13 +152,13 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
         </main>
 
         {/* ── bottom nav── */}
-        <navaria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white/95pb-[env(safe-area-inset-bottom)]backdrop-blur-md">
+        <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white/95pb-[env(safe-area-inset-bottom)]backdrop-blur-md">
           <div className="mx-auto grid max-w-smgrid-cols-7">
             {NAV.map(n=> {
               const active= view=== n.key const badge=
                 n.key=== 'farm' ? readyEggs : n.key=== 'games' ? 0 : n.key=== 'quests' ? claimable+ (canDaily? 1 :0)
                   : n.key=== 'social' ? socialBadge : n.key=== 'profile' ? state.user.claimableLevelRewards : 0 return(
-                <buttonkey={n.key}
+                <button key={n.key}
                   onClick={() => setView(n.key)}
                   aria-current={active? 'page' :undefined}
                   className={cn(
@@ -166,14 +166,14 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
                     active? 'text-green-700' :'text-stone-500hover:text-stone-700'
                   )}
                 >
-                  <spanaria-hidden="true" className={cn('text-xl transition-transform', active&& 'scale-110')}>{n.emoji}</span>
+                  <span aria-hidden="true" className={cn('text-xl transition-transform', active&& 'scale-110')}>{n.emoji}</span>
                   <span className="text-[10px] font-bold leading-none">{n.label}</span>
-                  {active&& <spanaria-hidden="true" className="absolute inset-x-2 top-0 h-0.5 rounded-fullbg-green-500" />}
+                  {active&& <span aria-hidden="true" className="absolute inset-x-2 top-0 h-0.5 rounded-fullbg-green-500" />}
                   {badge> 0&& (
                     <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-black leading-none text-white"
                     >
                       <span className="sr-only">{badge} new</span>
-                      <spanaria-hidden="true">{badge> 99? '99+' :badge}</span>
+                      <span aria-hidden="true">{badge> 99? '99+' :badge}</span>
                     </span>
                   )}
                 </button>
@@ -195,7 +195,7 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
                 exit={{ opacity:0, y: -16}}
                 transition={{ duration: 0.18}}
                 className={cn(
-                  'w-full max-w-sm rounded-2xl px-4 py-2.5 text-center text-xs font-boldshadow-xl',
+                  'w-full max-w-sm rounded-2xl px-4 py-2.5 text-center text-xs font-bold shadow-xl',
                   flash.type=== 'success' && 'bg-green-700  text-white',
                   flash.type=== 'error' && 'bg-red-700  text-white',
                   flash.type=== 'info' && 'bg-stone-800  text-white'
@@ -210,13 +210,13 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
         {/* ── hatch celebration modal── */}
         <AnimatePresence>
           {hatchResult&& (
-            <motion.divinitial={{ opacity: 0}}
+            <motion.div initial={{ opacity: 0}}
               animate={{ opacity: 1}}
               exit={{ opacity: 0}}
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/60p-6"
               onClick={() => setHatchResult(null)}
             >
-              <motion.divinitial={{ scale:0.6, rotate: -6}}
+              <motion.div initial={{ scale:0.6, rotate: -6}}
                 animate={{ scale:1, rotate: 0}}
                 transition={{ type:'spring', bounce: 0.5}}
                 className="relative w-full max-w-xs rounded-3xl border-4 border-amber-300 bg-gradient-to-b from-yellow-50 to-amber-100 p-6 text-centershadow-2xl"
@@ -225,7 +225,7 @@ constNAV:{ key:View; emoji:string; label: string}[]= [{ key:'farm', emoji:'🏡'
                 <div className="pointer-events-none absolute -top-2 right-4 text-2xl">🎉</div>
                 <div className="pointer-events-none absolute bottom-8 left-2 text-xl">🌟</div>
                 <div className="pointer-events-none absolute bottom-8 right-2 text-xl">💫</div>
-                <motion.divanimate={{ scale:[1, 1.2, 1], rotate:[0, 10, -10, 0]}}
+                <motion.div animate={{ scale:[1, 1.2, 1], rotate:[0, 10, -10, 0]}}
                   transition={{ repeat:Infinity, duration: 1.6}}
                   className="text-7xl"
                 >

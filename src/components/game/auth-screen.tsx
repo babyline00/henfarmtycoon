@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useState} from'react'
 import{ motion} from'framer-motion'
@@ -7,26 +7,26 @@ import{ Button} from'@/components/ui/button'
 import{ Input} from'@/components/ui/input'
 import{ Label} from'@/components/ui/label'
 
-export functionAuthScreen() {
+export function AuthScreen() {
   const{ authScreen, setAuthScreen, login, register, loading, showFlash} = useGame()
-  const[username, setUsername]= useState('')
-  const[password, setPassword]= useState('')
-  const[farmName, setFarmName]= useState('')
-  const[referralCode, setReferralCode]= useState('')
+  const [username, setUsername]= useState('')
+  const [password, setPassword]= useState('')
+  const [farmName, setFarmName]= useState('')
+  const [referralCode, setReferralCode]= useState('')
 
-  constisLogin= authScreen=== 'login'
+  const isLogin= authScreen=== 'login'
 
-  async functionhandleSubmit(e:React.FormEvent) {
+  async function handleSubmit(e:React.FormEvent) {
     e.preventDefault()
     try{
-      if(isLogin) awaitlogin(username, password)
-      else awaitregister(username, password, farmName, referralCode)
+      if(isLogin) await login(username, password)
+      else await register(username, password, farmName, referralCode)
     } catch(err) {
-      showFlash(err instanceofError? err.message :'Failed', 'error')
+      showFlash(err instanceof Error? err.message :'Failed', 'error')
     }
   }
 
-  functionfillDemo(kind:'player' | 'admin') {
+  function fillDemo(kind:'player' | 'admin') {
     setUsername(kind=== 'admin' ? 'admin' :'demo')
     setPassword(kind=== 'admin' ? 'admin123' :'demo123')
   }
@@ -35,35 +35,35 @@ export functionAuthScreen() {
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-sky-50 via-lime-50 to-amber-50px-5">
       {/* decorative field*/}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-green-200/70to-transparent" />
-      <div className="pointer-events-none absolute bottom-6 left-6 text-5xlopacity-70">🌾</div>
-      <div className="pointer-events-none absolute bottom-10 right-8 text-4xlopacity-60">🌻</div>
-      <div className="pointer-events-none absolute bottom-16 left-1/3 text-3xlopacity-50">🌿</div>
+      <div className="pointer-events-none absolute bottom-6 left-6 text-5xl opacity-70">🌾</div>
+      <div className="pointer-events-none absolute bottom-10 right-8 text-4xl opacity-60">🌻</div>
+      <div className="pointer-events-none absolute bottom-16 left-1/3 text-3xl opacity-50">🌿</div>
 
-      <motion.divinitial={{ y:-12, opacity: 0}}
+      <motion.div initial={{ y:-12, opacity: 0}}
         animate={{ y:0, opacity: 1}}
         className="relative z-10 flex w-full max-w-sm flex-colitems-center"
       >
-        <motion.divanimate={{ rotate:[0, -8, 8, 0]}}
+        <motion.div animate={{ rotate:[0, -8, 8, 0]}}
           transition={{ repeat:Infinity, duration:2.4, ease:'easeInOut' }}
           className="text-7xldrop-shadow-lg"
         >
           🐔
         </motion.div>
-        <h1className="mt-2 text-3xl font-black tracking-tighttext-stone-800">
+        <h1 className="mt-2 text-3xl font-black tracking-tighttext-stone-800">
           HenFarm<span className="text-green-600">Tycoon</span>
         </h1>
         <p className="mt-1 text-center text-smtext-stone-500">
           Build your coop· Hatch rare hens· Get rich🥚💰
         </p>
 
-        <div className="mt-6 w-full rounded-3xl border border-stone-200 bg-white/90 p-5 shadow-xlbackdrop-blur">
+        <div className="mt-6 w-full rounded-3xl border border-stone-200 bg-white/90 p-5 shadow-xl backdrop-blur">
           <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-stone-100  p-1">
-            <buttontype="button"
+            <button type="button"
               onClick={() => setAuthScreen('login')}
               className={`rounded-lg py-2 text-sm font-bold transition-all${isLogin? 'bg-white text-green-700shadow' :'text-stone-500'}`}
             >
               Login</button>
-            <buttontype="button"
+            <button type="button"
               onClick={() => setAuthScreen('register')}
               className={`rounded-lg py-2 text-sm font-bold transition-all${!isLogin? 'bg-white text-green-700shadow' :'text-stone-500'}`}
             >
@@ -73,7 +73,7 @@ export functionAuthScreen() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <Label htmlFor="username" className="text-xs font-boldtext-stone-500">FarmerID</Label>
-              <Inputid="username"
+              <Input id="username"
                 value={username}
                 onChange={e=> setUsername(e.target.value)}
                 placeholder="e.g.farmer_joe"
@@ -85,7 +85,7 @@ export functionAuthScreen() {
             {!isLogin&& (
               <div>
                 <Label htmlFor="farmName" className="text-xs font-boldtext-stone-500">FarmName</Label>
-                <Inputid="farmName"
+                <Input id="farmName"
                   value={farmName}
                   onChange={e=> setFarmName(e.target.value)}
                   placeholder="e.g.SunnyMeadows"
@@ -96,7 +96,7 @@ export functionAuthScreen() {
 
             <div>
               <Label htmlFor="password" className="text-xs font-boldtext-stone-500">Password</Label>
-              <Inputid="password"
+              <Input id="password"
                 type="password"
                 value={password}
                 onChange={e=> setPassword(e.target.value)}
@@ -111,7 +111,7 @@ export functionAuthScreen() {
                 <Label htmlFor="ref" className="text-xs font-boldtext-stone-500">
                   ReferralCode<span className="font-normaltext-stone-600">(optional— +200 coinseach!)</span>
                 </Label>
-                <Inputid="ref"
+                <Input id="ref"
                   value={referralCode}
                   onChange={e=> setReferralCode(e.target.value.toUpperCase())}
                   placeholder="e.g.DEMO2026"
@@ -120,9 +120,9 @@ export functionAuthScreen() {
               </div>
             )}
 
-            <Buttontype="submit"
+            <Button type="submit"
               disabled={loading}
-              className="h-12 w-full rounded-xl bg-gradient-to-r from-green-600 to-lime-600 text-base font-extrabold text-white shadow-lg transition-transform active:scale-[0.98]disabled:opacity-60"
+              className="h-12 w-full rounded-xl bg-gradient-to-r from-green-600 to-lime-600 text-base font-extrabold text-white shadow-lg transition-transform active:scale-[0.98] disabled:opacity-60"
             >
               {loading? 'Pleasewait...' :isLogin? '🚜 EnterFarm' :'🌱 StartMyFarm'}
             </Button>

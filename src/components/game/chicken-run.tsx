@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useEffect, useRef, useState, useCallback} from'react'
 import{ motion} from'framer-motion'
@@ -6,23 +6,23 @@ import{ cn} from'@/lib/utils'
 
 //══════════ Phase 33— MiniGame 1:ChickenRun(endlessrunner) ══════════
 // 3 lanes· swipe/arrows to switch lanes· swipe up/space to jump //Jump clears"low" obstacles(rocks, barriers, dogs) — cars& trees must be dodged. //Collectibles:🥚 eggs· 🪙 coins· 💎 gems· 🎁 mystery boxes //The client only tracks rawtelemetry; ALL rewards are computed server-side. interfaceProps{
-  sessionId: string tier: numbertierName: stringspeedMult: numberwinTarget: numberonEnd:(telemetry:{ distance:number; coins:number; eggs:number; gems:number; boxes: number}) => voidonQuit:() => void}
+  sessionId: string tier: number; tierName: string; speedMult: number; winTarget: number; onEnd:(telemetry:{ distance:number; coins:number; eggs:number; gems:number; boxes: number}) => void; onQuit:() => void}
 
-interfaceEntity{
+interface Entity{
   x:number; y: number kind:'coin' | 'egg' | 'gem' | 'box' | 'obstacle'
   obstacle?: string // emojilow?: booleanhit?: booleandead?: boolean}
 
-constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]= [{ e:'🪨', name:'rock' }, { e:'🚧', name:'barrier' }, { e:'🐕', name:'dog' },
-] constTALL_OBSTACLES:{ e:string; name: string}[]= [{ e:'🚗', name:'car' }, { e:'🌳', name:'tree' },
-] export functionChickenRun({ sessionId, tier, tierName, speedMult, winTarget, onEnd, onQuit}:Props) {
-  constcanvasRef= useRef<HTMLCanvasElement>(null)
-  const[hud, setHud]= useState({ distance:0, lives:3, coins:0, eggs:0, gems:0, boxes:0, mps: 0})
-  const[ended, setEnded]= useState<null| 'win' | 'loss'>(null)
-  constendedRef= useRef(false)
-  constonEndRef= useRef(onEnd)
+const LANES_X = [0.25, 0.5, 0.75] const LOW_OBSTACLES:{ e:string; name: string}[]= [{ e:'🪨', name:'rock' }, { e:'🚧', name:'barrier' }, { e:'🐕', name:'dog' },
+] const TALL_OBSTACLES:{ e:string; name: string}[]= [{ e:'🚗', name:'car' }, { e:'🌳', name:'tree' },
+] export function ChickenRun({ sessionId, tier, tierName, speedMult, winTarget, onEnd, onQuit}:Props) {
+  const canvasRef= useRef<HTMLCanvasElement>(null)
+  const [hud, setHud]= useState({ distance:0, lives:3, coins:0, eggs:0, gems:0, boxes:0, mps: 0})
+  const [ended, setEnded]= useState<null| 'win' | 'loss'>(null)
+  const endedRef= useRef(false)
+  const onEndRef= useRef(onEnd)
   useEffect(() => { onEndRef.current= onEnd})
 
-  conststateRef= useRef({
+  const stateRef= useRef({
     lane:1, laneAnim:1, // 0..2(laneAnim is float whilelerping)
     jumpT:-1, // -1= grounded; 0..1= air progress lives:3, invuln:0,
     distance:0, speed:8,
@@ -33,7 +33,7 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
   })
 
   const finish= useCallback((result:'win' | 'loss') => {
-    if(endedRef.current) returnendedRef.current= truestateRef.current.running= falsesetEnded(result)
+    if(endedRef.current) return endedRef.current= truestateRef.current.running= falsesetEnded(result)
     const s= stateRef.currentsetTimeout(() => {
       onEndRef.current({
         distance:Math.floor(s.distance), coins:s.coins,
@@ -52,26 +52,26 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
     }
     resize()
 
-    const ro= typeofResizeObserver!== 'undefined' ? newResizeObserver(resize) : nullro?.observe(canvas)
+    const ro= typeof ResizeObserver!== 'undefined' ? new ResizeObserver(resize) : nullro?.observe(canvas)
 
-    constPX_PER_M = 6 const s= stateRef.current let raf= 0 let last= performance.now()
+    const PX_PER_M = 6 const s= stateRef.current let raf= 0 let last= performance.now()
 
     //── input──
-    constmoveLane= (dir: -1| 1) => {
+    const moveLane= (dir: -1| 1) => {
       if(!s.running|| endedRef.current) return s.lane= Math.max(0, Math.min(2, s.lane+ dir))
     }
     const jump= () => {
       if(!s.running|| endedRef.current) return if(s.jumpT < 0) s.jumpT = 0}
 
-    lettouchStart:{ x:number; y:number; t: number} | null= null constonTouchStart= (e:TouchEvent) => {
+    lettouchStart:{ x:number; y:number; t: number} | null= null const onTouchStart= (e:TouchEvent) => {
       const t= e.changedTouches[0]touchStart= { x:t.clientX, y:t.clientY, t:Date.now() }
     }
-    constonTouchEnd= (e:TouchEvent) => {
+    const onTouchEnd= (e:TouchEvent) => {
       if(!touchStart) return const t= e.changedTouches[0] const dx= t.clientX -touchStart.x const dy= t.clientY -touchStart.y if(Math.abs(dx) < 24&& Math.abs(dy) < 24) { jump() }
       else if(Math.abs(dx) > Math.abs(dy)) { moveLane(dx> 0? 1 :-1) }
       else if(dy< 0) { jump() }
       touchStart= null}
-    constonKey= (e:KeyboardEvent) => {
+    const onKey= (e:KeyboardEvent) => {
       if(e.key=== 'ArrowLeft' || e.key=== 'a') moveLane(-1)
       else if(e.key=== 'ArrowRight' || e.key=== 'd') moveLane(1)
       else if(e.key=== 'ArrowUp' || e.key=== ' ' || e.key=== 'w') { e.preventDefault(); jump() }
@@ -88,11 +88,11 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
     document.addEventListener('visibilitychange', onHidden)
 
     //── spawning──
-    functionspawnWave() {
+    function spawnWave() {
       const roll= Math.random()
       if(roll< 0.62) {
         // obstacle wave: block 1-2 lanes(tier raises double-blockchance)
-        constdoubleBlock= Math.random() < 0.25+ tier* 0.08 const lanes= [0, 1, 2].sort(() => Math.random() -0.5)
+        const doubleBlock= Math.random() < 0.25+ tier* 0.08 const lanes= [0, 1, 2].sort(() => Math.random() -0.5)
         const blocked= doubleBlock? [lanes[0], lanes[1]] : [lanes[0]] for(const ln ofblocked) {
           const low= Math.random() < 0.55 const pool= low? LOW_OBSTACLES :TALL_OBSTACLES
           const ob= pool[Math.floor(Math.random() * pool.length)]s.entities.push({ kind:'obstacle', x:LANES_X[ln], y:-50, obstacle:ob.e, low})
@@ -107,7 +107,7 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
       s.nextSpawnAt= s.distance+ 22+ Math.random() * 26}
 
     //── loop──
-    functionloop(now:number) {
+    function loop(now:number) {
       raf= requestAnimationFrame(loop)
       const dt= Math.min(0.05, (now -last) /1000)
       last= now if(!s.running|| endedRef.current) { draw(); return}
@@ -120,7 +120,7 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
       // spawn if(s.distance>= s.nextSpawnAt) spawnWave()
 
       // move entities+ collisions constplayerY = H - 86 const px= LANES_X[0]* W + s.laneAnim* ((LANES_X[1] -LANES_X[0]) * W)
-      constjumpH = s.jumpT >= 0? Math.sin(s.jumpT * Math.PI) * 72 : 0 constplayerRect= { x: px -19, y:playerY - 36 -jumpH, w:38, h: 38}
+      const jumpH = s.jumpT >= 0? Math.sin(s.jumpT * Math.PI) * 72 : 0 const playerRect= { x: px -19, y:playerY - 36 -jumpH, w:38, h: 38}
 
       for(const en ofs.entities) {
         en.y+= dyPx if(en.dead) continue const ex= en.x* W
@@ -154,14 +154,14 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
       draw()
     }
 
-    functiondraw() {
+    function draw() {
       // sky/ground per tier const palettes= [['#fefce8', '#d9f99d', '#a3e635'], // farm['#f0fdf4', '#bbf7d0', '#86efac'], // village['#eff6ff', '#bfdbfe', '#93c5fd'], // city['#f5f5f4', '#d6d3d1', '#a8a29e'], // highway['#1c1917', '#44403c', '#fbbf24'], // legendary(night)
       ] const p= palettes[Math.min(tier, palettes.length -1)] const grad= ctx!.createLinearGradient(0, 0, 0, H)
       grad.addColorStop(0, p[0])
       grad.addColorStop(1, p[1])
       ctx!.fillStyle= gradctx!.fillRect(0, 0, W, H)
 
-      constshakeX = s.shake> 0? Math.sin(s.shake* 60) * 4 : 0ctx!.save()
+      const shakeX = s.shake> 0? Math.sin(s.shake* 60) * 4 : 0ctx!.save()
       ctx!.translate(shakeX, 0)
 
       // scrolling road stripes const scroll= (s.distance* PX_PER_M) % 80ctx!.fillStyle= p[2]+ '55'
@@ -192,7 +192,7 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
       }
 
       // player chicken const px2= LANES_X[0]* W + s.laneAnim* ((LANES_X[1] -LANES_X[0]) * W)
-      constplayerY = H - 86 constjumpH = s.jumpT >= 0? Math.sin(s.jumpT * Math.PI) * 72 : 0 const blink= s.invuln> 0&& Math.floor(s.time* 10) % 2=== 0 // shadowctx!.fillStyle= '#00000022'
+      const playerY = H - 86 const jumpH = s.jumpT >= 0? Math.sin(s.jumpT * Math.PI) * 72 : 0 const blink= s.invuln> 0&& Math.floor(s.time* 10) % 2=== 0 // shadowctx!.fillStyle= '#00000022'
       ctx!.beginPath()
       ctx!.ellipse(px2, playerY + 8, 20 -jumpH * 0.12, 7 -jumpH * 0.05, 0, 0, Math.PI * 2)
       ctx!.fill()
@@ -249,7 +249,7 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
       </div>
 
       <div className="relative flex-1">
-        <canvasref={canvasRef} className="h-full w-full touch-noneselect-none" />
+        <canvas ref={canvasRef} className="h-full w-full touch-noneselect-none" />
 
         {/* mobile control hints*/}
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
@@ -265,10 +265,10 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
         </div>
 
         {ended&& (
-          <motion.divinitial={{ opacity: 0}} animate={{ opacity: 1}}
+          <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}}
             className="absolute inset-0 flex flex-col items-center justify-centerbg-black/70"
           >
-            <motion.divanimate={{ scale:[1, 1.2, 1]}} transition={{ repeat:Infinity, duration: 1.2}} className="text-7xl">
+            <motion.div animate={{ scale:[1, 1.2, 1]}} transition={{ repeat:Infinity, duration: 1.2}} className="text-7xl">
               {ended=== 'win' ? '🏁' :'💥'}
             </motion.div>
             <p className="mt-3 text-2xl font-black text-white">{ended=== 'win' ? 'FINISH!' :'OUCH!'}</p>
@@ -280,9 +280,9 @@ constLANES_X = [0.25, 0.5, 0.75] constLOW_OBSTACLES:{ e:string; name: string}[]=
   )
 }
 
-functiondispatchKey(key:string) {
-  window.dispatchEvent(newKeyboardEvent('keydown', { key}))
+function dispatchKey(key:string) {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key}))
 }
 
-functionrectsOverlap(a:{ x:number; y:number; w:number; h: number}, b:{ x:number; y:number; w:number; h: number}) {
+function rectsOverlap(a:{ x:number; y:number; w:number; h: number}, b:{ x:number; y:number; w:number; h: number}) {
   return a.x< b.x+ b.w&& a.x+ a.w> b.x&& a.y< b.y+ b.h&& a.y+ a.h> b.y}

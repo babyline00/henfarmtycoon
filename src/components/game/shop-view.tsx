@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useState} from'react'
 import{ useGame} from'@/lib/store'
@@ -10,12 +10,12 @@ import{ Button} from'@/components/ui/button'
 import{ GameCard, RarityBadge} from'./shared'
 import{ cn} from'@/lib/utils'
 
-typeTab= 'hens' | 'eggs' | 'animals' | 'items' | 'upgrades' | 'premium'
+type Tab= 'hens' | 'eggs' | 'animals' | 'items' | 'upgrades' | 'premium'
 
-constHEN_REQ_LEVEL:Record<string, number> = { normal:0, golden:1, royal:2, magic: 3}
+const HEN_REQ_LEVEL:Record<string, number> = { normal:0, golden:1, royal:2, magic: 3}
 
 // building defs(server holds authoritativeprices)
-constBUILDINGS = [{
+const BUILDINGS = [{
     key:'incubator', name:'IncubatorRoom', emoji:'🏹',
     levelField:'incubatorLevel' asconst, maxLevel:2,
     prices:[0, 3000, 12000],
@@ -33,16 +33,16 @@ constBUILDINGS = [{
     prices:[0, 2500, 8000, 20000],
     effectFor:(lvl:number) => lvl=== 0? 'Bigger animal cap+ production' :`${[6, 10, 16, 24][lvl]} animal cap· +${[0, 5, 10, 15][lvl]}% animaloutput`,
   },
-] constPAY_METHODS = [{ key:'card', label:'💳 Card' },
+] const PAY_METHODS = [{ key:'card', label:'💳 Card' },
   { key:'bank', label:'🏦 Bank' },
   { key:'usdt', label:'💵 USDT' },
-] export functionShopView() {
+] export function ShopView() {
   const{ state, act, loading} = useGame()
-  const[tab, setTab]= useState<Tab>('hens')
-  const[payMethod, setPayMethod]= useState('card')
+  const [tab, setTab]= useState<Tab>('hens')
+  const [payMethod, setPayMethod]= useState('card')
 
-  if(!state) return null const{ user, farm, hens, animals} = state constlevelIdx= user.levelIdx async functionbuy(itemType:string, subType:string) {
-    awaitact('buy', { itemType, subType})
+  if(!state) return null const{ user, farm, hens, animals} = state const levelIdx= user.levelIdx async function buy(itemType:string, subType:string) {
+    await act('buy', { itemType, subType})
   }
 
   return(
@@ -55,7 +55,7 @@ constBUILDINGS = [{
       {/* tabs*/}
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-stone-100  p-1">
         {(['hens', 'eggs', 'animals', 'items', 'upgrades', 'premium'] asTab[]).map(t=> (
-          <buttonkey={t}
+          <button key={t}
             onClick={() => setTab(t)}
             className={cn(
               'rounded-xl py-2 text-xs font-extrabold capitalize transition-all',
@@ -73,8 +73,8 @@ constBUILDINGS = [{
         <div className="space-y-2">
           {Object.values(HEN_TYPES).map(def=> {
             const locked= levelIdx< (HEN_REQ_LEVEL[def.key]?? 0)
-            const affordable= user.coins>= def.price const full= hens.length>= farm.coopCap constreqName= FARMER_LEVELS[HEN_REQ_LEVEL[def.key]]?.name return(
-              <GameCardkey={def.key} className={cn(locked&& 'opacity-75')}>
+            const affordable= user.coins>= def.price const full= hens.length>= farm.coopCap const reqName= FARMER_LEVELS[HEN_REQ_LEVEL[def.key]]?.name return(
+              <GameCard key={def.key} className={cn(locked&& 'opacity-75')}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-3xl">
                     {def.emoji}
@@ -100,7 +100,7 @@ constBUILDINGS = [{
                       <Buttonsize="sm"
                         onClick={() => buy('hen', def.key)}
                         disabled={loading|| !affordable|| full}
-                        className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                        className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                       >
                         {full? 'CoopFull' :!affordable? 'Needcoins' :'Buy'}
                       </Button>
@@ -121,7 +121,7 @@ constBUILDINGS = [{
           {Object.values(EGG_TYPES).filter(e=> e.purchasable).map(def=> {
             const affordable= user.coins>= (def.buyPrice?? 0)
             return(
-              <GameCardkey={def.key}>
+              <GameCard key={def.key}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-3xl">
                     {def.emoji}
@@ -136,7 +136,7 @@ constBUILDINGS = [{
                     <Buttonsize="sm"
                       onClick={() => buy('egg', def.key)}
                       disabled={loading|| !affordable}
-                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                     >
                       {!affordable? 'Needcoins' :'Buy'}
                     </Button>
@@ -146,7 +146,7 @@ constBUILDINGS = [{
                   <p className="text-[10px] font-black uppercasetext-stone-600">Possiblerewards</p>
                   <div className="mt-1 flex flex-wrapgap-1">
                     {def.hatchTable.map(r=> (
-                      <spankey={r.reward} className="rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-[9px] font-boldtext-stone-500">
+                      <span key={r.reward} className="rounded-full border border-stone-200 bg-white px-1.5 py-0.5 text-[9px] font-boldtext-stone-500">
                         {rewardLabel(r.reward)} · {r.chance}%
                       </span>
                     ))}
@@ -164,7 +164,7 @@ constBUILDINGS = [{
           {Object.values(ANIMAL_TYPES).map(def=> {
             const affordable= user.coins>= def.price const full= animals.length>= Math.max(farm.landCap, farm.shelterCap)
             return(
-              <GameCardkey={def.key}>
+              <GameCard key={def.key}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-3xl">
                     {def.emoji}
@@ -181,7 +181,7 @@ constBUILDINGS = [{
                     <Buttonsize="sm"
                       onClick={() => buy('animal', def.key)}
                       disabled={loading|| !affordable|| full}
-                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                     >
                       {full? 'PensFull' :!affordable? 'Needcoins' :'Buy'}
                     </Button>
@@ -200,7 +200,7 @@ constBUILDINGS = [{
             🎒 Items are stored in yourBarn(Farmtab).Use them anytime forboosts, healing& instant growth.</p>
           {Object.values(ITEM_TYPES).map(def=> {
             const gem= !!def.gemPrice const affordable= gem? user.gems>= def.gemPrice! : user.coins>= def.price return(
-              <GameCardkey={def.key}>
+              <GameCard key={def.key}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-2xl">
                     {def.emoji}
@@ -216,7 +216,7 @@ constBUILDINGS = [{
                     <Buttonsize="sm"
                       onClick={() => buy('item', def.key)}
                       disabled={loading|| !affordable}
-                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                      className="mt-1 h-8 rounded-full bg-green-700 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                     >
                       {!affordable? 'Needfunds' :'Buy'}
                     </Button>
@@ -232,9 +232,9 @@ constBUILDINGS = [{
       {tab=== 'upgrades' && (
         <div className="space-y-2">
           {Object.values(UPGRADES).map(def=> {
-            constcurLevel= def.key=== 'coop' ? farm.coopLevel : def.key=== 'land' ? farm.landLevel :farm.storageLevel const maxed= curLevel>= def.levels.length const next= def.levels[curLevel] const affordable= user.coins>= (next?.price?? 0)
+            const curLevel= def.key=== 'coop' ? farm.coopLevel : def.key=== 'land' ? farm.landLevel :farm.storageLevel const maxed= curLevel>= def.levels.length const next= def.levels[curLevel] const affordable= user.coins>= (next?.price?? 0)
             return(
-              <GameCardkey={def.key}>
+              <GameCard key={def.key}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-3xl">
                     {def.emoji}
@@ -259,7 +259,7 @@ constBUILDINGS = [{
                         <Buttonsize="sm"
                           onClick={() => buy('upgrade', def.key)}
                           disabled={loading|| !affordable}
-                          className="mt-1 h-8 rounded-full bg-amber-800 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                          className="mt-1 h-8 rounded-full bg-amber-800 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                         >
                           {!affordable? 'Needcoins' :'Upgrade'}
                         </Button>
@@ -273,8 +273,8 @@ constBUILDINGS = [{
 
           <p className="pt-2 text-center text-[10px] font-black uppercase tracking-widetext-stone-600">🏗️ FarmBuildings</p>
           {BUILDINGS.map(b=> {
-            constcurLevel= farm[b.levelField] const maxed= curLevel>= b.maxLevel const price= b.prices[Math.min(curLevel+ 1, b.prices.length -1)] const affordable= user.coins>= price return(
-              <GameCardkey={b.key}>
+            const curLevel= farm[b.levelField] const maxed= curLevel>= b.maxLevel const price= b.prices[Math.min(curLevel+ 1, b.prices.length -1)] const affordable= user.coins>= price return(
+              <GameCard key={b.key}>
                 <div className="flex items-start gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-stone-50  text-3xl">
                     {b.emoji}
@@ -301,7 +301,7 @@ constBUILDINGS = [{
                         <Buttonsize="sm"
                           onClick={() => buy('building', b.key)}
                           disabled={loading|| !affordable}
-                          className="mt-1 h-8 rounded-full bg-amber-800 px-3 text-xs font-extrabold text-white active:scale-95disabled:opacity-40"
+                          className="mt-1 h-8 rounded-full bg-amber-800 px-3 text-xs font-extrabold text-white active:scale-95 disabled:opacity-40"
                         >
                           {!affordable? 'Needcoins' :curLevel=== 0? 'Build' :'Upgrade'}
                         </Button>
@@ -318,7 +318,7 @@ constBUILDINGS = [{
             <div className="mt-2 space-y-1.5">
               {FARMER_LEVELS.map((l, i) => {
                 const unlocked= levelIdx>= i return(
-                  <divkey={l.name} className="flex items-center gap-2">
+                  <div key={l.name} className="flex items-center gap-2">
                     <span className={cn('text-sm', !unlocked&& 'grayscaleopacity-50')}>{unlocked? '✅' :'🔒'}</span>
                     <span className={cn('flex-1 text-[11px] font-bold', unlocked? 'text-stone-700' :'text-stone-600')}>
                       {l.name} <span className="font-normal">· {l.xp.toLocaleString()} XP · {l.unlock}</span>
@@ -342,7 +342,7 @@ constBUILDINGS = [{
             <p className="text-xs font-blacktext-stone-700">💳 Paymentmethod</p>
             <div className="mt-2 grid grid-cols-3 gap-1">
               {PAY_METHODS.map(m=> (
-                <buttonkey={m.key}
+                <button key={m.key}
                   onClick={() => setPayMethod(m.key)}
                   className={cn(
                     'rounded-xl border py-2 text-[11px] font-black',
@@ -359,7 +359,7 @@ constBUILDINGS = [{
           <p className="text-center text-[10px] font-black uppercase tracking-widetext-stone-600">💎 GemPacks</p>
           <div className="grid grid-cols-2 gap-2">
             {GEM_PACKS.map(p=> (
-              <GameCardkey={p.key} className={cn('relativetext-center', p.tag=== 'BEST VALUE' && 'border-pink-400bg-pink-50/50')}>
+              <GameCard key={p.key} className={cn('relativetext-center', p.tag=== 'BEST VALUE' && 'border-pink-400bg-pink-50/50')}>
                 {p.tag&& (
                   <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 rounded-full bg-pink-500 px-2 py-0.5 text-[8px] font-black text-white">
                     {p.tag}
@@ -370,7 +370,7 @@ constBUILDINGS = [{
                 <p className="text-[10px] font-boldtext-stone-500">{p.name}</p>
                 {p.bonusPct> 0&& <p className="text-[9px] font-blacktext-green-600">+{p.bonusPct}% bonus</p>}
                 <Buttonsize="sm"
-                  onClick={async() => { awaitact('purchase_gems', { sku:p.key, method:payMethod}) }}
+                  onClick={async() => { await act('purchase_gems', { sku:p.key, method:payMethod}) }}
                   disabled={loading}
                   className="mt-2 h-8 w-full rounded-full bg-pink-500 text-xs font-extrabold text-white  active:scale-95"
                 >
@@ -383,14 +383,14 @@ constBUILDINGS = [{
           {/* VIP plans*/}
           <p className="pt-2 text-center text-[10px] font-black uppercase tracking-widetext-stone-600">👑 VIP Subscriptions</p>
           {Object.values(VIP_PLANS).map(v=> {
-            constisCurrent= state.user.vip?.plan=== v.key return(
-              <GameCardkey={v.key} className="bg-gradient-to-r from-amber-50 via-yellow-50to-white">
+            const isCurrent= state.user.vip?.plan=== v.key return(
+              <GameCard key={v.key} className="bg-gradient-to-r from-amber-50 via-yellow-50to-white">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-blacktext-stone-800">{v.name} <span className="text-[10px] font-boldtext-amber-600">· {v.days} days</span></p>
                     <ul className="mt-1 space-y-0.5">
                       {v.perks.map(p=> (
-                        <likey={p} className="text-[11px] font-boldtext-stone-500">✓ {p}</li>
+                        <li key={p} className="text-[11px] font-boldtext-stone-500">✓ {p}</li>
                       ))}
                     </ul>
                   </div>
@@ -401,7 +401,7 @@ constBUILDINGS = [{
                         ✓ Active</span>
                     ) :(
                       <Buttonsize="sm"
-                        onClick={async() => { awaitact('purchase_vip', { planKey:v.key, method:payMethod}) }}
+                        onClick={async() => { await act('purchase_vip', { planKey:v.key, method:payMethod}) }}
                         disabled={loading}
                         className="mt-1 h-9 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 px-4 text-xs font-extrabold text-white shadowactive:scale-95"
                       >
@@ -418,8 +418,8 @@ constBUILDINGS = [{
   )
 }
 
-functionrewardLabel(reward:string): string{
-  const[kind, arg]= reward.split(':')
+function rewardLabel(reward:string): string{
+  const [kind, arg]= reward.split(':')
   if(kind=== 'chick' || kind=== 'mutation') return`${HEN_TYPES[arg]?.emoji?? ' chick'} ${HEN_TYPES[arg]?.name?? 'Chick'}`
   if(kind=== 'coins') return`🪙 ${arg}`
   if(kind=== 'gems') return`💎 ${arg}`

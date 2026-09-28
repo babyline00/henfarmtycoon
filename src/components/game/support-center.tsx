@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useCallback, useEffect, useState} from'react'
 import{ api, useGame} from'@/lib/store'
@@ -10,41 +10,41 @@ import{ cn} from'@/lib/utils'
 
 //══════════ Phase 25— CustomerSupportCenter(playerside) ══════════
 
-interfaceTicketRow{
-  id:string; subject:string; category:string; status: stringassignedTo: string| null; createdAt:string; updatedAt: stringlastMessage:{ sender:string; body: string} | null}
-interfaceTicketMsg{ id:string; sender:string; senderName:string; body:string; createdAt: string}
-interfaceTicketFull{
-  id:string; subject:string; category:string; status: stringassignedTo: string| null; messages:TicketMsg[]}
+interface TicketRow{
+  id:string; subject:string; category:string; status: string; assignedTo: string| null; createdAt:string; updatedAt: string; lastMessage:{ sender:string; body: string} | null}
+interface TicketMsg{ id:string; sender:string; senderName:string; body:string; createdAt: string}
+interface TicketFull{
+  id:string; subject:string; category:string; status: string; assignedTo: string| null; messages:TicketMsg[]}
 
-constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health at100%, use feed buffs(+20-100%), hatch rare breeds and play arcade games in the🎮 Gamestab.' },
+const FAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health at100%, use feed buffs(+20-100%), hatch rare breeds and play arcade games in the🎮 Gamestab.' },
   { q:'Why did my eggs stopproducing?', a:'Check farm health(feed yourhens), the weather(storms-15%), and whether your hens are retired.A Scarecrow item blocks stormpenalties.' },
   { q:'How do withdrawalswork?', a:'Request a payout inProfile→ Wallet(min shownthere).Admins review within24-48h; approved payouts deduct coinsimmediately.' },
   { q:'My purchase did notarrive', a:'Open a ticket with category"payment" and include the purchase method— support will verify andre-deliver.' },
   { q:'Someone scammed me on themarket', a:'Open a"market" ticket with the listing title.Trades are alllogged; staff can investigate and refund where rules werebroken.' },
-] constCATS = [{ key:'bug', label:'🐞 Bug' },
+] const CATS = [{ key:'bug', label:'🐞 Bug' },
   { key:'account', label:'👤 Account' },
   { key:'payment', label:'💳 Payment' },
   { key:'market', label:'🏪 Market' },
   { key:'other', label:'📄 Other' },
-] export functionSupportCenter() {
+] export function SupportCenter() {
   const{ showFlash} = useGame()
-  const[tickets, setTickets]= useState<TicketRow[]>([])
-  const[open, setOpen]= useState<TicketFull| null>(null)
-  const[creating, setCreating]= useState(false)
-  const[subject, setSubject]= useState('')
-  const[category, setCategory]= useState('bug')
-  const[message, setMessage]= useState('')
-  const[reply, setReply]= useState('')
-  const[busy, setBusy]= useState(false)
-  const[faqOpen, setFaqOpen]= useState<number| null>(0)
+  const [tickets, setTickets]= useState<TicketRow[]>([])
+  const [open, setOpen]= useState<TicketFull| null>(null)
+  const [creating, setCreating]= useState(false)
+  const [subject, setSubject]= useState('')
+  const [category, setCategory]= useState('bug')
+  const [message, setMessage]= useState('')
+  const [reply, setReply]= useState('')
+  const [busy, setBusy]= useState(false)
+  const [faqOpen, setFaqOpen]= useState<number| null>(0)
 
-  const[loadError, setLoadError]= useState<string| null>(null)
-  const[loadingList, setLoadingList]= useState(true)
+  const [loadError, setLoadError]= useState<string| null>(null)
+  const [loadingList, setLoadingList]= useState(true)
 
   const load= useCallback(async() => {
     setLoadingList(true)
     try{
-      const res= awaitapi<{ tickets:TicketRow[]}>('/api/support')
+      const res= await api<{ tickets:TicketRow[]}>('/api/support')
       setTickets(res.tickets)
       setLoadError(null)
     } catch(e) {
@@ -56,48 +56,48 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
 
   useEffect(() => { load() }, [load])
 
-  async functionopenTicket(id:string) {
+  async function openTicket(id:string) {
     try{
-      const res= awaitapi<{ ticket:TicketFull}>(`/api/support?ticketId=${id}`)
+      const res= await api<{ ticket:TicketFull}>(`/api/support?ticketId=${id}`)
       setOpen(res.ticket)
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to openticket', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to openticket', 'error')
     }
   }
 
-  async functioncreateTicket() {
+  async function createTicket() {
     setBusy(true)
     try{
-      const res= awaitapi<{ message: string}>('/api/support', {
+      const res= await api<{ message: string}>('/api/support', {
         method:'POST', body:{ action:'create', subject, category, message},
       })
       showFlash(res.message)
       setCreating(false); setSubject(''); setMessage('')
       load()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to createticket', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to createticket', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functionsendReply() {
-    if(!open|| !reply.trim()) returnsetBusy(true)
+  async function sendReply() {
+    if(!open|| !reply.trim()) return setBusy(true)
     try{
-      awaitapi('/api/support', { method:'POST', body:{ action:'reply', ticketId:open.id, message: reply} })
+      await api('/api/support', { method:'POST', body:{ action:'reply', ticketId:open.id, message: reply} })
       setReply('')
-      awaitopenTicket(open.id)
+      await openTicket(open.id)
       load()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed tosend', 'error')
+      showFlash(e instanceof Error? e.message :'Failed tosend', 'error')
     } finally{ setBusy(false) }
   }
 
-  async functioncloseTicket() {
+  async function closeTicket() {
     if(!open) return try{
-      const res= awaitapi<{ message: string}>('/api/support', { method:'POST', body:{ action:'close', ticketId: open.id} })
+      const res= await api<{ message: string}>('/api/support', { method:'POST', body:{ action:'close', ticketId: open.id} })
       showFlash(res.message)
       setOpen(null); load()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed', 'error')
+      showFlash(e instanceof Error? e.message :'Failed', 'error')
     }
   }
 
@@ -121,7 +121,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
               <Label className="text-[10px] font-boldtext-stone-500">Category</Label>
               <div className="mt-1 flex flex-wrapgap-1">
                 {CATS.map(c=> (
-                  <buttonkey={c.key} onClick={() => setCategory(c.key)}
+                  <button key={c.key} onClick={() => setCategory(c.key)}
                     className={cn('rounded-full border px-2.5 py-1 text-[11px] font-bold',
                       category=== c.key? 'border-green-500 bg-green-50  text-green-700' :'border-stone-200text-stone-600')}>
                     {c.label}
@@ -131,11 +131,11 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
             </div>
             <div>
               <Label className="text-[10px] font-boldtext-stone-500">Subject</Label>
-              <Inputvalue={subject} onChange={e=> setSubject(e.target.value)} className="mt-1 h-9 rounded-lgbg-stone-50" placeholder="Short summary e.g.Missing goldenegg" />
+              <Input value={subject} onChange={e=> setSubject(e.target.value)} className="mt-1 h-9 rounded-lgbg-stone-50" placeholder="Short summary e.g.Missing goldenegg" />
             </div>
             <div>
               <Label className="text-[10px] font-boldtext-stone-500">Describe theissue</Label>
-              <textareavalue={message} onChange={e=> setMessage(e.target.value)}
+              <textarea value={message} onChange={e=> setMessage(e.target.value)}
                 className="mt-1 min-h-20 w-full rounded-lg border border-stone-200 bg-stone-50 p-2 text-xs"
                 placeholder="Whathappened? When did itstart? Include any errormessages..."
               />
@@ -151,7 +151,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
       {/* my tickets*/}
       {loadError? (
         <GameCard>
-          <ErrorStatetitle="Couldn't load yourtickets" message={loadError} onRetry={() => { load() }} />
+          <ErrorState title="Couldn't load yourtickets" message={loadError} onRetry={() => { load() }} />
         </GameCard>
       ) :loadingList&& tickets.length=== 0? (
         <GameCard><LoadingSpinnerlabel="Loadingtickets..." /></GameCard>
@@ -159,7 +159,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
         <GameCard><EmptyStateemoji="📭" title="No ticketsyet" sub="Anything broken or confusing— open a ticketabove" /></GameCard>
       ) :(
         tickets.map(t=> (
-          <GameCardkey={t.id} className="cursor-pointer py-2.5" onClick={() => openTicket(t.id)}>
+          <GameCard key={t.id} className="cursor-pointer py-2.5" onClick={() => openTicket(t.id)}>
             <div className="flex items-center gap-2">
               <span className={cn(
                 'rounded-full px-2 py-0.5 text-[9px] font-black uppercase',
@@ -175,7 +175,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
                   {t.lastMessage? `${t.lastMessage.sender=== 'staff' ? '💬 Staff' :'You'}:${t.lastMessage.body}` :'—'}
                 </p>
               </div>
-              <span className="text-[9px]text-stone-600">{newDate(t.updatedAt).toLocaleDateString()}</span>
+              <span className="text-[9px]text-stone-600">{new Date(t.updatedAt).toLocaleDateString()}</span>
             </div>
           </GameCard>
         ))
@@ -186,7 +186,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
         <p className="text-sm font-blacktext-stone-800">❓ FAQ</p>
         <div className="mt-1 divide-ydivide-stone-100">
           {FAQ.map((f, i) => (
-            <divkey={i} className="py-1">
+            <div key={i} className="py-1">
               <button onClick={() => setFaqOpen(faqOpen=== i? null :i)} className="flex w-full items-center justify-between py-1text-left">
                 <span className="text-[11px] font-boldtext-stone-600">{f.q}</span>
                 <span className="text-[10px]text-stone-600">{faqOpen=== i? '▲' :'▼'}</span>
@@ -214,7 +214,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
 
             <div className="mt-3 max-h-72 space-y-2 overflow-y-auto rounded-xl bg-stone-50  p-2">
               {open.messages.map(m=> (
-                <divkey={m.id} className={cn('flex', m.sender=== 'staff' ? 'justify-start' :'justify-end')}>
+                <div key={m.id} className={cn('flex', m.sender=== 'staff' ? 'justify-start' :'justify-end')}>
                   <div className={cn(
                     'max-w-[80%] rounded-2xl px-3 py-2 text-[11px]',
                     m.sender=== 'staff' ? 'bg-green-100  text-stone-700' :'bg-stone-200  text-stone-700'
@@ -223,7 +223,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
                       {m.sender=== 'staff' ? `🛡️ ${m.senderName}` :m.senderName}
                     </p>
                     {m.body}
-                    <p className="mt-1 text-[8px]text-stone-600">{newDate(m.createdAt).toLocaleString()}</p>
+                    <p className="mt-1 text-[8px]text-stone-600">{new Date(m.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
               ))}
@@ -232,7 +232,7 @@ constFAQ = [{ q:'How doI earn coinsfaster?', a:'Collect eggsdaily, keep health a
             {open.status!== 'closed' ? (
               <>
                 <div className="mt-2 flex gap-2">
-                  <Inputvalue={reply} onChange={e=> setReply(e.target.value)} placeholder="Write areply..."
+                  <Input value={reply} onChange={e=> setReply(e.target.value)} placeholder="Write areply..."
                     className="h-10 flex-1 rounded-xl bg-stone-50  text-xs"
                     onKeyDown={e=> { if(e.key=== 'Enter') sendReply() }} />
                   <Button onClick={sendReply} disabled={busy|| !reply.trim()} className="h-10 rounded-xl bg-green-600 px-4 text-xs font-extrabold text-white">Send</Button>

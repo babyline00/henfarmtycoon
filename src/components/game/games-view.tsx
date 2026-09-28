@@ -1,4 +1,4 @@
-'useclient'
+'use client'
 
 import{ useCallback, useEffect, useState} from'react'
 import{ motion} from'framer-motion'
@@ -10,22 +10,22 @@ import{ cn} from'@/lib/utils'
 
 //══════════ Phase 33— MiniGamesHub══════════
 
-interfaceEnergyState{
-  energy:number; max:number; regenPerHour: numbernextEnergyInSec:number; vipFast: boolean}
-interfaceTierInfo{
+interface EnergyState{
+  energy:number; max:number; regenPerHour: number; nextEnergyInSec:number; vipFast: boolean}
+interface TierInfo{
   key:string; name:string; reqLevel:number; mult: number desc:string; current:boolean; locked: boolean}
-interfaceGameView{
-  id:string; key:string; name:string; emoji:string; description: string enabled:boolean; energyCost:number; winTarget: numbermyBestScore:number; myBestDistance:number; totalPlays: number}
-interfaceBoardRow{ userId:string; username:string; avatar:string; farmName:string; vip:boolean; value: number}
-interfaceHubData{
-  energy:EnergyState tier: numbertierInfo:TierInfo[]seasonRewards:{ rank:number; prize:string; emoji:string; detail: string}[] games:GameView[] leaderboards:Record<string, { daily:BoardRow[]; weekly:BoardRow[]; monthly:BoardRow[]}>
+interface GameView{
+  id:string; key:string; name:string; emoji:string; description: string enabled:boolean; energyCost:number; winTarget: number; myBestScore:number; myBestDistance:number; totalPlays: number}
+interface BoardRow{ userId:string; username:string; avatar:string; farmName:string; vip:boolean; value: number}
+interface HubData{
+  energy:EnergyState tier: number; tierInfo:TierInfo[]seasonRewards:{ rank:number; prize:string; emoji:string; detail: string}[] games:GameView[] leaderboards:Record<string, { daily:BoardRow[]; weekly:BoardRow[]; monthly:BoardRow[]}>
   recentSessions:{ id:string; gameKey:string; score:number; distance:number; coins:number; eggs:number; gems:number; xp:number; result:string; createdAt: string}[] stats:{ totalGames:number; wins:number; losses:number; highestScore:number; bestDistance:number; totalRewards:number; playTimeSec: number}
   arcadeRewardsEnabled: boolean}
 
-export interfaceFinishResult{
-  ok?: booleanrejected?: booleanreason?: stringresult?: stringcoins?:number; eggs?:number; gems?:number; xp?: numberduration?: numberlines?: string[]mysteryItems?: string[]championBuff?: booleanmessage?: string}
+export interface FinishResult{
+  ok?: boolean; rejected?: boolean; reason?: string; result?: string; coins?:number; eggs?:number; gems?:number; xp?: number; duration?: number; lines?: string[]mysteryItems?: string[]championBuff?: boolean; message?: string}
 
-typeActiveGame= { key:'chicken_run' | 'road_crossing'; sessionId:string; tier:number; tierName:string; tierMult:number; speedMult:number; winTarget: number} | null constGAME_META:Record<string, { controls:string[]; objective: string}> = {
+type ActiveGame= { key:'chicken_run' | 'road_crossing'; sessionId:string; tier:number; tierName:string; tierMult:number; speedMult:number; winTarget: number} | null const GAME_META:Record<string, { controls:string[]; objective: string}> = {
   chicken_run:{
     controls:['⬅️➡️ swipe / arrows= switchlane', '⬆️ swipe / space= jump', 'Jump clearsrocks, barriers& dogs— not cars& trees'],
     objective:'Run 1000m towin! Collect🥚🪙💎🎁 on theway.',
@@ -36,20 +36,20 @@ typeActiveGame= { key:'chicken_run' | 'road_crossing'; sessionId:string; tier:nu
   },
 }
 
-export functionGamesView() {
+export function GamesView() {
   const{ showFlash, refresh} = useGame()
-  const[hub, setHub]= useState<HubData| null>(null)
-  const[board, setBoard]= useState<'daily' | 'weekly' | 'monthly'>('daily')
-  const[active, setActive]= useState<ActiveGame>(null)
-  const[result, setResult]= useState<FinishResult| null>(null)
-  const[starting, setStarting]= useState<string| null>(null)
-  const[tick, setTick]= useState(0)
+  const [hub, setHub]= useState<HubData| null>(null)
+  const [board, setBoard]= useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [active, setActive]= useState<ActiveGame>(null)
+  const [result, setResult]= useState<FinishResult| null>(null)
+  const [starting, setStarting]= useState<string| null>(null)
+  const [tick, setTick]= useState(0)
 
   const load= useCallback(async() => {
     try{
-      setHub(awaitapi<HubData>('/api/mini'))
+      setHub(await api<HubData>('/api/mini'))
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to loadarcade', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to loadarcade', 'error')
     }
   }, [showFlash])
 
@@ -59,10 +59,10 @@ export functionGamesView() {
     return() => clearInterval(t)
   }, [])
 
-  async functionstartGame(game:GameView) {
-    if(starting) returnsetStarting(game.key)
+  async function startGame(game:GameView) {
+    if(starting) return setStarting(game.key)
     try{
-      const res= awaitapi<ActiveGame& { ok: boolean}>('/api/mini', {
+      const res= await api<ActiveGame& { ok: boolean}>('/api/mini', {
         method:'POST',
         body:{ action:'start', gameKey: game.key},
       })
@@ -72,15 +72,15 @@ export functionGamesView() {
         tierMult:res.tierMult!, speedMult:res.speedMult!, winTarget:res.winTarget!,
       })
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Cannot startgame', 'error')
+      showFlash(e instanceof Error? e.message :'Cannot startgame', 'error')
     } finally{
       setStarting(null)
     }
   }
 
-  constfinishGame= useCallback(async(sessionId:string, telemetry:Record<string, number>) => {
+  const finishGame= useCallback(async(sessionId:string, telemetry:Record<string, number>) => {
     try{
-      const res= awaitapi<FinishResult>('/api/mini', {
+      const res= await api<FinishResult>('/api/mini', {
         method:'POST',
         body:{ action:'finish', sessionId, ...telemetry},
       })
@@ -88,7 +88,7 @@ export functionGamesView() {
       if(res.rejected) showFlash(res.message?? 'Resultrejected', 'error')
       refresh()
     } catch(e) {
-      showFlash(e instanceofError? e.message :'Failed to submitresult', 'error')
+      showFlash(e instanceof Error? e.message :'Failed to submitresult', 'error')
     } finally{
       setActive(null)
       load()
@@ -97,14 +97,14 @@ export functionGamesView() {
 
   if(active) {
     if(active.key=== 'chicken_run') {
-      return<ChickenRunsessionId={active.sessionId}
+      return<ChickenRunsessi onId={active.sessionId}
         tier={active.tier} tierName={active.tierName}
         speedMult={active.speedMult} winTarget={active.winTarget}
         onEnd={(tel) => finishGame(active.sessionId, tel)}
         onQuit={() => setActive(null)}
       />
     }
-    return<RoadCrossingsessionId={active.sessionId}
+    return<RoadCrossingsessi onId={active.sessionId}
       tier={active.tier} tierName={active.tierName}
       speedMult={active.speedMult} winTarget={active.winTarget}
       onEnd={(tel) => finishGame(active.sessionId, tel)}
@@ -114,9 +114,9 @@ export functionGamesView() {
 
   if(!hub) return<LoadingSpinnerlabel="Booting thearcade..." />
 
-  const e= hub.energy constenergyPct= (e.energy /e.max) * 100 void tick // re-render every second to advance countdown return(
+  const e= hub.energy const energyPct= (e.energy /e.max) * 100 void tick // re-render every second to advance countdown return(
     <div className="px-3 pb-4">
-      <SectionTitleright={
+      <Secti onTitleright={
         <span className="rounded-full bg-purple-100 border border-purple-300 px-2 py-0.5 text-[10px] font-blacktext-purple-700">
           TIER:{hub.tierInfo[hub.tier]?.name?? 'Farm'} ×{hub.tierInfo[hub.tier]?.mult?? 1}
         </span>
@@ -145,7 +145,7 @@ export functionGamesView() {
       {hub.games.map(g=> {
         const meta= GAME_META[g.key]?? { controls:[], objective:'' }
         return(
-          <GameCardkey={g.id} className={cn('mb-3', !g.enabled&& 'opacity-60')}>
+          <GameCard key={g.id} className={cn('mb-3', !g.enabled&& 'opacity-60')}>
             <div className="flex items-start gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100text-3xl">
                 {g.emoji}
@@ -165,7 +165,7 @@ export functionGamesView() {
               </div>
             </div>
             <ul className="mt-2 space-y-0.5 rounded-xl bg-stone-50  p-2">
-              {meta.controls.map((c, i) => <likey={i} className="text-[10px]text-stone-500">{c}</li>)}
+              {meta.controls.map((c, i) => <li key={i} className="text-[10px]text-stone-500">{c}</li>)}
             </ul>
             <button onClick={() => startGame(g)}
               disabled={starting=== g.key|| !g.enabled|| hub.energy.energy< g.energyCost}
@@ -182,7 +182,7 @@ export functionGamesView() {
       })}
 
       {/* ── my arcade stats── */}
-      <SectionTitle>📊 MyArcadeStats</SectionTitle>
+      <Secti onTitle>📊 MyArcadeStats</SectionTitle>
       <GameCard className="mb-3">
         <div className="grid grid-cols-3 gap-2text-center">
           <div><p className="text-lg font-black text-stone-800tabular-nums">{hub.stats.totalGames}</p><p className="text-[9px] font-bold uppercasetext-stone-600">Games</p></div>
@@ -195,10 +195,10 @@ export functionGamesView() {
       </GameCard>
 
       {/* ── leaderboards── */}
-      <SectionTitleright={
+      <Secti onTitleright={
         <div className="flex gap-1">
           {(['daily', 'weekly', 'monthly'] asconst).map(b=> (
-            <buttonkey={b} onClick={() => setBoard(b)}
+            <button key={b} onClick={() => setBoard(b)}
               className={cn('rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize transition-all',
                 board=== b? 'bg-purple-700 text-white  shadow' :'bg-stone-100  text-stone-500')}>
               {b}
@@ -209,14 +209,14 @@ export functionGamesView() {
 
       {hub.games.map(g=> {
         const rows= hub.leaderboards[g.key]?.[board]?? [] return(
-          <GameCardkey={g.id} className="mb-3">
+          <GameCard key={g.id} className="mb-3">
             <p className="mb-2 text-xs font-blacktext-stone-700">{g.emoji} {g.name} — {board=== 'daily' ? 'TopScore(today)' : board=== 'weekly' ? 'MostDistance(7d)' :'ChampionFarmer(month)'}</p>
             {rows.length=== 0? (
               <p className="py-3 text-center text-[11px]text-stone-600">No scores yet— be the firstchampion! 🐔</p>
             ) :(
               <div className="space-y-1.5">
                 {rows.map((r, i) => (
-                  <divkey={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i=== 0&& 'bg-amber-50 borderborder-amber-200', i=== 1&& 'bg-stone-50', i=== 2&& 'bg-orange-50/60')}>
+                  <div key={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i=== 0&& 'bg-amber-50 borderborder-amber-200', i=== 1&& 'bg-stone-50', i=== 2&& 'bg-orange-50/60')}>
                     <span className="w-6 text-center text-xs font-black">{['🥇', '🥈', '🥉'][i]?? `${i+ 1}`}</span>
                     <span className="text-lg">{r.avatar}</span>
                     <div className="min-w-0 flex-1">
@@ -239,10 +239,10 @@ export functionGamesView() {
       })}
 
       {/* ── season rewards── */}
-      <SectionTitle>🗓️ Season 1Rewards</SectionTitle>
+      <Secti onTitle>🗓️ Season 1Rewards</SectionTitle>
       <GameCard className="mb-3">
         {hub.seasonRewards.map(r=> (
-          <divkey={r.rank} className="flex items-center gap-3 border-b border-stone-100 py-2 last:border-0">
+          <div key={r.rank} className="flex items-center gap-3 border-b border-stone-100 py-2 last:border-0">
             <span className="text-2xl">{r.emoji}</span>
             <div className="flex-1">
               <p className="text-[11px] font-blacktext-stone-700">{['🥇 1st', '🥈 2nd', '🥉 3rd'][r.rank -1]} — {r.prize}</p>
@@ -254,10 +254,10 @@ export functionGamesView() {
       </GameCard>
 
       {/* ── tier ladder── */}
-      <SectionTitle>⚡ DifficultyTiers</SectionTitle>
+      <Secti onTitle>⚡ DifficultyTiers</SectionTitle>
       <GameCard className="mb-3">
         {hub.tierInfo.map(t=> (
-          <divkey={t.key} className={cn('flex items-center gap-2 border-b border-stone-100 py-2 last:border-0', t.locked&& 'opacity-50')}>
+          <div key={t.key} className={cn('flex items-center gap-2 border-b border-stone-100 py-2 last:border-0', t.locked&& 'opacity-50')}>
             <span className="text-lg">{t.current? '📍' : t.locked? '🔒' :'✅'}</span>
             <div className="flex-1">
               <p className="text-[11px] font-blacktext-stone-700">{t.name} <span className="text-purple-600">×{t.mult}</span></p>
@@ -270,16 +270,16 @@ export functionGamesView() {
       {/* ── recent sessions── */}
       {hub.recentSessions.length> 0&& (
         <>
-          <SectionTitle>🕹️ RecentPlays</SectionTitle>
+          <Secti onTitle>🕹️ RecentPlays</SectionTitle>
           <GameCard>
             {hub.recentSessions.map(s=> (
-              <divkey={s.id} className="flex items-center gap-2 border-b border-stone-100 py-1.5 text-[11px] last:border-0">
+              <div key={s.id} className="flex items-center gap-2 border-b border-stone-100 py-1.5 text-[11px] last:border-0">
                 <span>{s.gameKey=== 'chicken_run' ? '🏃' :'🚦'}</span>
                 <span className={cn('font-black', s.result=== 'win' ? 'text-green-600' :'text-stone-500')}>
                   {s.result=== 'win' ? 'WIN' :'LOSS'}
                 </span>
                 <span className="flex-1 text-stone-600tabular-nums">
-                  {s.gameKey=== 'chicken_run' ? `${s.distance}m` :`${s.score} roads`} · {newDate(s.createdAt).toLocaleDateString()}
+                  {s.gameKey=== 'chicken_run' ? `${s.distance}m` :`${s.score} roads`} · {new Date(s.createdAt).toLocaleDateString()}
                 </span>
                 <span className="font-bold text-amber-600tabular-nums">🪙{s.coins}</span>
               </div>
@@ -290,11 +290,11 @@ export functionGamesView() {
 
       {/* ── reward result modal── */}
       {result&& (
-        <motion.divinitial={{ opacity: 0}} animate={{ opacity: 1}}
+        <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60p-6"
           onClick={() => setResult(null)}
         >
-          <motion.divinitial={{ scale:0.7, y: 30}} animate={{ scale:1, y: 0}}
+          <motion.div initial={{ scale:0.7, y: 30}} animate={{ scale:1, y: 0}}
             transition={{ type:'spring', bounce: 0.45}}
             className={cn(
               'w-full max-w-xs rounded-3xl border-4 bg-gradient-to-b p-6 text-centershadow-2xl',
@@ -303,7 +303,7 @@ export functionGamesView() {
                 :'border-stone-300 from-stone-50to-stone-100'
             )}
           >
-            <motion.divanimate={{ scale:[1, 1.15, 1], rotate:[0, 8, -8, 0]}}
+            <motion.div animate={{ scale:[1, 1.15, 1], rotate:[0, 8, -8, 0]}}
               transition={{ repeat:Infinity, duration: 1.8}}
               className="text-6xl"
             >
