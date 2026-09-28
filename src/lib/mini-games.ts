@@ -158,6 +158,16 @@ export const RUN_MAX_DURATION_SEC = 300
 /** Jump arc length, in metres-equivalent pixels. Mirrors the client. */
 export const RUN_JUMP_HEIGHT = 72
 
+/**
+ * Combo economics. Each step in an unbroken pickup chain is worth
+ * RUN_COMBO_STEP more of the coin pickup value, and the chain that counts
+ * is capped at RUN_COMBO_CAP so the ceiling is +100% rather than
+ * unbounded. A streak cannot exceed the pickups actually collected, which
+ * is what makes it unforgeable.
+ */
+export const RUN_COMBO_STEP = 0.05
+export const RUN_COMBO_CAP = 20
+
 // ── Road Crossing ──
 /**
  * Minimum seconds between advancing a row. This is a pacing rule, not
@@ -280,6 +290,8 @@ export interface RunTelemetry {
   eggs: number
   gems: number
   boxes: number
+  /** Longest unbroken chain of pickups. Validated, never trusted. */
+  combo?: number
 }
 
 export interface CrossTelemetry {
@@ -305,8 +317,22 @@ function tierMultOf(tier: number): number {
   return GAME_TIERS[Math.min(tier, GAME_TIERS.length - 1)]?.mult ?? 1
 }
 
+/**
+ * Coerce telemetry to a non-negative whole number.
+ *
+ * `Math.max(0, Math.floor(v))` is NOT safe on its own: Math.max(0, NaN) is
+ * NaN, so a single non-finite field propagates through the whole reward
+ * calculation and the payout becomes NaN. The route sanitises its input,
+ * but this is the security boundary and it is called directly by tests, so
+ * it has to hold on its own.
+ */
+function toCount(v: number | undefined): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 0
+  return Math.max(0, Math.floor(v))
+}
+
 function capN(v: number, max: number): number {
-  return Math.max(0, Math.min(Math.floor(v), max))
+  return Math.min(toCount(v), Math.max(0, Math.floor(max)))
 }
 
 export function evaluateRun(
@@ -338,7 +364,21 @@ export function evaluateRun(
   const boxes = capN(tel.boxes, maxBoxes)
 
   const win = dist >= MINI_GAME_DEFS.chicken_run.winTarget
-  const pickupCoins = Math.floor(coins * 12)
+
+  // ── combo ──
+  // A chain of unbroken pickups pays more, which is the whole reason to
+  // take a risky line for one collectible instead of playing safe. The
+  // multiplier is a SERVER rule applied to a SERVER-validated number: a
+  // client may claim any combo it likes, but a streak longer than the
+  // pickups actually collected is impossible — you cannot chain 40
+  // pickups while claiming 3 — so it is capped to the total collected,
+  // with the bonus itself capped on top. Nothing here can be inflated by
+  // editing telemetry.
+  const totalPickups = coins + eggs + gems + boxes
+  const claimedCombo = toCount(tel.combo)
+  const combo = Math.min(claimedCombo, totalPickups, RUN_COMBO_CAP)
+  const comboMult = 1 + combo * RUN_COMBO_STEP
+  const pickupCoins = Math.floor(coins * 12 * comboMult)
   const baseCoins = Math.floor(dist * MINI_GAME_DEFS.chicken_run.coinsPerMeter)
   const winBonus = win ? Math.floor(300 * mult) : 0
   const totalCoins = Math.floor((baseCoins + pickupCoins + winBonus) * mult)
@@ -346,6 +386,8 @@ export function evaluateRun(
 
   if (baseCoins > 0) lines.push(`🏃 ${dist}m run → 🪙 ${baseCoins}`)
   if (coins > 0) lines.push(`🪙 ${coins} coin pickups → 🪙 ${pickupCoins}`)
+  if (combo >= 2) lines.push(`🔥 ${combo}-pickup combo → ×${comboMult.toFixed(2)}`)
+  else if (claimedCombo > combo) lines.push(`🔥 combo capped at ${combo} (you collected ${totalPickups})`)
   if (eggs > 0) lines.push(`🥚 ${eggs} egg(s) collected`)
   if (gems > 0) lines.push(`💎 ${gems} gem(s) collected`)
   if (winBonus > 0) lines.push(`🏆 Victory bonus → 🪙 ${winBonus} (×${mult} tier)`)

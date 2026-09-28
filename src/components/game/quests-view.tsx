@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useGame, api } from '@/lib/store'
 import { DAILY_REWARDS } from '@/lib/game'
 import { Button } from '@/components/ui/button'
-import { GameCard, ProgressBar, SectionTitle, ErrorState, LoadingSpinner } from './shared'
+import { GameCard, ProgressBar, SectionTitle, ErrorState, LoadingSpinner, ScrollList } from './shared'
 import { cn } from '@/lib/utils'
 
 interface LbRow {
@@ -166,7 +166,9 @@ export function QuestsView() {
           <p className="py-6 text-center text-xs font-bold text-stone-600">No farmers on this board yet.</p>
         </GameCard>
       ) : (
-        <ol className="space-y-1.5">
+        // The board is server-capped but still far taller than a screen,
+        // so it gets the same five-row viewport as the other rankings.
+        <ScrollList count={rows.length} label={`${LB_CATEGORIES.find(c => c.key === lbCat)?.label ?? 'Leaderboard'} rankings`} visible={5} rowHeight={58}>
           {rows.map((r, i) => (
             <GameCard key={r.id}
               className={cn('flex items-center gap-3 py-2.5', r.id === lb.myId && 'border-amber-400 bg-amber-50')}>
@@ -191,7 +193,7 @@ export function QuestsView() {
               </div>
             </GameCard>
           ))}
-        </ol>
+        </ScrollList>
       )}
     </div>
   )

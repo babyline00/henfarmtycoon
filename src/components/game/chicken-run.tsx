@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { play } from '@/lib/sfx'
 // The physics lives in lib/mini-games so the server validator and this
 // game cannot disagree. They used to: the client topped out at
 // 24 m/s × the tier multiplier while the server capped at a hand-picked
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils'
 // rejected as a cheater and flagged for review.
 import {
   RUN_START_SPEED_MPS, RUN_BASE_SPEED_MPS, RUN_RAMP_METRES, RUN_JUMP_HEIGHT,
-  runMaxSpeedMps,
+  runMaxSpeedMps, RUN_COMBO_CAP,
 } from '@/lib/mini-games'
 
 //══════════ MiniGame 1: Chicken Run (endless runner) ══════════
@@ -25,7 +26,7 @@ interface Props {
   tierName: string
   speedMult: number
   winTarget: number
-  onEnd: (telemetry: { distance: number; coins: number; eggs: number; gems: number; boxes: number }) => void
+  onEnd: (telemetry: { distance: number; coins: number; eggs: number; gems: number; boxes: number; combo: number }) => void
   onQuit: () => void
 }
 
@@ -49,7 +50,7 @@ const EMOJI_FOR: Record<string, string> = { coin: '🪙', egg: '🥚', gem: '�
 
 export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [hud, setHud] = useState({ distance: 0, lives: MAX_LIVES, coins: 0, eggs: 0, gems: 0, boxes: 0, mps: 0 })
+  const [hud, setHud] = useState({ distance: 0, lives: MAX_LIVES, coins: 0, eggs: 0, gems: 0, boxes: 0, mps: 0, combo: 0 })
   const [ended, setEnded] = useState<null | 'win' | 'loss'>(null)
   const endedRef = useRef(false)
   const onEndRef = useRef(onEnd)
@@ -69,6 +70,11 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
     eggs: 0,
     gems: 0,
     boxes: 0,
+    // combo: the unbroken pickup chain. A hit resets it. The server
+    // recomputes the reward from `bestCombo` and caps it to the pickups
+    // actually claimed, so this counter is a read-out, not the payout.
+    combo: 0,
+    bestCombo: 0,
     entities: [] as Entity[],
     nextSpawnAt: 30,     // meters
     shake: 0,
@@ -83,7 +89,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
     setTimeout(() => {
       onEndRef.current({
         distance: Math.floor(s.distance), coins: s.coins,
-        eggs: s.eggs, gems: s.gems, boxes: s.boxes,
+        eggs: s.eggs, gems: s.gems, boxes: s.boxes, combo: s.bestCombo,
       })
     }, 900)
   }, [])
@@ -237,12 +243,19 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
               s.lives -= 1
               s.invuln = 1.4
               s.shake = 0.3
+              s.combo = 0 // a hit breaks the chain
               if (s.lives <= 0) finish('loss')
             }
           }
         } else {
           if (rectsOverlap(playerRect, { x: ex - 17, y: en.y - 17, w: 34, h: 34 })) {
             en.dead = true
+            s.combo += 1
+            if (s.combo > s.bestCombo) s.bestCombo = s.combo
+            // The pickup cue rises with the chain, so the combo is audible
+            // without looking away from the lane. Purely a read-out: the
+            // payout is the server's number.
+            play(s.combo >= RUN_COMBO_CAP ? 'win' : 'coin')
             if (en.kind === 'coin') s.coins++
             else if (en.kind === 'egg') s.eggs++
             else if (en.kind === 'gem') s.gems++
@@ -260,7 +273,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
         setHud({
           distance: Math.floor(s.distance), lives: s.lives,
           coins: s.coins, eggs: s.eggs, gems: s.gems, boxes: s.boxes,
-          mps: Math.round(s.speed),
+          mps: Math.round(s.speed), combo: s.combo,
         })
       }
 
@@ -392,6 +405,26 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
         </span>
         <span className="text-[10px] font-bold text-stone-300">⚡ {hud.mps} m/s</span>
       </div>
+
+      {hud.combo >= 2 && (
+        <div
+          role="status"
+          aria-live="off"
+          className="pointer-events-none absolute inset-x-0 top-1 z-10 flex justify-center"
+        >
+          <span
+            className={cn(
+              'rounded-full px-3 py-0.5 text-[11px] font-black tabular-nums shadow',
+              hud.combo >= RUN_COMBO_CAP
+                ? 'bg-amber-600 text-white'
+                : 'bg-stone-900/80 text-white',
+            )}
+          >
+            🔥 ×{(1 + hud.combo * 0.05).toFixed(2)}
+            <span className="sr-only"> combo, {hud.combo} in a row</span>
+          </span>
+        </div>
+      )}
 
       <div className="relative flex-1">
         <canvas

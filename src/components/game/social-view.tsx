@@ -7,7 +7,7 @@ import { HEN_TYPES, ANIMAL_TYPES } from '@/lib/game'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { GameCard, SectionTitle, EmptyState, ProgressBar, ErrorState, LoadingSpinner } from './shared'
+import { GameCard, SectionTitle, EmptyState, ProgressBar, ErrorState, LoadingSpinner, ScrollList } from './shared'
 import { cn } from '@/lib/utils'
 
 interface FriendRow {
@@ -449,7 +449,9 @@ export function SocialView() {
           <div className="space-y-1.5">
             {data.clanList.length === 0 ? (
               <GameCard><EmptyState emoji="🛡️" title="No clans yet" sub="Be the first to found one!" /></GameCard>
-            ) : data.clanList.map(c => (
+            ) : (
+            <ScrollList count={data.clanList.length} label="Clan leaderboard" visible={5} rowHeight={58}>
+              {data.clanList.map(c => (
               <GameCard key={c.id} className={cn('flex items-center gap-2 py-2.5', data.clan?.id === c.id && 'border-purple-400 bg-purple-50')}>
                 <span className={cn(
                   'w-7 text-center text-sm font-black',
@@ -477,7 +479,9 @@ export function SocialView() {
                   )}
                 </div>
               </GameCard>
-            ))}
+              ))}
+            </ScrollList>
+          )}
           </div>
         </>
       )}

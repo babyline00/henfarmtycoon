@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   const dayAgo = new Date(Date.now() - 86400000)
 
-  const [games, totals, today, perGame, cheated, recent, topScores] = await Promise.all([
+  const [games, totals, today, perGame, cheated, recent, topScores, analytics] = await Promise.all([
     db.miniGame.findMany({ orderBy: { createdAt: 'asc' } }),
     db.gameSession.aggregate({
       where: { result: { in: ['win', 'loss'] } },
@@ -55,7 +55,27 @@ export async function GET(req: Request) {
       orderBy: { _sum: { score: 'desc' } },
       take: 3,
     }),
+    // Per-game health. The panel showed flat lifetime counters, which
+    // answer "how many plays" but never "is this game any good" — you
+    // need win rate, how far a typical run gets, and what it pays.
+    db.gameSession.groupBy({
+      by: ['gameKey'],
+      where: { result: { in: ['win', 'loss'] }, duration: { gte: 1 } },
+      _count: true,
+      _sum: { duration: true, score: true, coins: true, xp: true },
+      _avg: { duration: true, score: true, coins: true, xp: true },
+    }),
   ])
+
+  // Distinct players per game. Plays per player separates "lots of people
+  // tried it once" from "a few people play it constantly", which is the
+  // difference between a game with reach and a game with a devoted core.
+  const uniquePlayers = await db.gameSession.groupBy({
+    by: ['gameKey'],
+    where: { result: { in: ['win', 'loss'] } },
+    _count: { userId: true },
+  })
+  const playersByGame = new Map(uniquePlayers.map(r => [r.gameKey, r._count.userId]))
 
   const seasonUserIds = topScores.map(r => r.userId)
   const seasonUsers = await db.user.findMany({
@@ -92,6 +112,31 @@ export async function GET(req: Request) {
       playsToday: today,
       cheatedCount: cheated.length,
     },
+    // Per-game analytics, in the panel's units: score means metres for the
+    // runner, rows for the crossing, eggs for the catcher.
+    analytics: analytics.map(a => {
+      const plays = a._count
+      const wins = playsByGame[a.gameKey]?.wins ?? 0
+      const players = playersByGame.get(a.gameKey) ?? 0
+      return {
+        gameKey: a.gameKey,
+        plays,
+        wins,
+        losses: Math.max(0, plays - wins),
+        winRate: plays > 0 ? Math.round((wins / plays) * 100) : 0,
+        uniquePlayers: players,
+        playsPerPlayer: players > 0 ? Math.round((plays / players) * 10) / 10 : 0,
+        avgDurationSec: Math.round(a._avg.duration ?? 0),
+        avgScore: Math.round(a._avg.score ?? 0),
+        avgCoins: Math.round(a._avg.coins ?? 0),
+        avgXp: Math.round(a._avg.xp ?? 0),
+        // coins per minute of play: the honest measure of whether a game
+        // is worth its energy cost
+        coinsPerMinute: (a._avg.duration ?? 0) > 0
+          ? Math.round(((a._avg.coins ?? 0) / (a._avg.duration ?? 1)) * 60)
+          : 0,
+      }
+    }),
     cheated: cheated.map(s => ({
       id: s.id, gameKey: s.gameKey, createdAt: s.createdAt,
       username: s.user.username, farmName: s.user.farmName, flagged: s.user.flagged,

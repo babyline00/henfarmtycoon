@@ -227,6 +227,7 @@ export async function POST(req: Request) {
         eggs: num(body.eggs),
         gems: num(body.gems),
         boxes: num(body.boxes),
+        combo: num(body.combo),
       }, session.tier, durationSec)
     } else if (session.gameKey === 'road_crossing') {
       outcome = evaluateCross({

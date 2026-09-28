@@ -29,6 +29,7 @@ import {
   crossWinTarget, winTargetFor,
   evaluateRun, evaluateCross, evaluateCatch,
   catchMaxItems, catchSpawnRate, catchFallSpeed, CATCH_MAX_DURATION_SEC,
+  RUN_COMBO_CAP, RUN_COMBO_STEP,
   type RunTelemetry, type CrossTelemetry,
 } from '../src/lib/mini-games'
 
@@ -305,4 +306,58 @@ test('every registered game has a definition, a target and a cost', () => {
     expect(MINI_GAME_DEFS[key].defaultEnergyCost).toBeGreaterThan(0)
     expect(MINI_GAME_DEFS[key].name.length).toBeGreaterThan(0)
   }
+})
+
+// ── combo: a server rule, not a client counter ───────────────
+
+test('a combo pays more, and only for pickups actually claimed', () => {
+  const base: RunTelemetry = { distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: 0 }
+  const comboed: RunTelemetry = { ...base, combo: 20 }
+  const plain = evaluateRun(base, 0, 90)
+  const hot = evaluateRun(comboed, 0, 90)
+  expect(hot.coins).toBeGreaterThan(plain.coins)
+  expect(hot.coins).toBeLessThanOrEqual(plain.coins * 2) // capped at +100%
+})
+
+test('a forged combo cannot exceed the pickups collected', () => {
+  // The whole point: claiming a 500 streak while collecting 3 coins must
+  // not buy the multiplier.
+  const honest: RunTelemetry = { distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: 0 }
+  const forged: RunTelemetry = { ...honest, combo: 500 }
+  const a = evaluateRun(honest, 0, 90)
+  const b = evaluateRun(forged, 0, 90)
+  // 24 pickups collected, so the streak is clamped to 24 (and to the cap)
+  expect(b.coins).toBeLessThan(a.coins * 2)
+  // and it is exactly what a legitimate 24-streak would pay
+  const legit = evaluateRun({ ...honest, combo: 24 }, 0, 90)
+  expect(b.coins).toBe(legit.coins)
+})
+
+test('the combo multiplier is capped, so it cannot run away', () => {
+  const max = evaluateRun({ distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: 9999 }, 0, 90)
+  const capped = evaluateRun({ distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: RUN_COMBO_CAP }, 0, 90)
+  expect(max.coins).toBe(capped.coins)
+  expect(capped.coins).toBeLessThan(evaluateRun({ distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: 0 }, 0, 90).coins * 2.01)
+})
+
+test('a negative or non-finite combo is treated as no combo', () => {
+  const base: RunTelemetry = { distance: 900, coins: 20, eggs: 3, gems: 1, boxes: 0, combo: 0 }
+  const none = evaluateRun(base, 0, 90)
+  for (const c of [-50, NaN, Infinity]) {
+    const out = evaluateRun({ ...base, combo: c }, 0, 90)
+    expect(out.coins, `combo=${c}`).toBe(none.coins)
+  }
+})
+
+test('a combo with no pickups at all pays nothing extra', () => {
+  const out = evaluateRun({ distance: 900, coins: 0, eggs: 0, gems: 0, boxes: 0, combo: 50 }, 0, 90)
+  const plain = evaluateRun({ distance: 900, coins: 0, eggs: 0, gems: 0, boxes: 0, combo: 0 }, 0, 90)
+  expect(out.coins).toBe(plain.coins)
+})
+
+test('the combo ceiling is exactly the documented one', () => {
+  expect(RUN_COMBO_CAP).toBe(20)
+  expect(RUN_COMBO_STEP).toBeCloseTo(0.05, 6)
+  // cap 20 x 5% = +100%
+  expect(1 + RUN_COMBO_CAP * RUN_COMBO_STEP).toBeCloseTo(2, 6)
 })

@@ -145,6 +145,43 @@
     scrollbar-width: thin;
   }
 
+  /* The capped list is a focusable region so it can be scrolled from the
+     keyboard, which means it needs its own focus ring. It is not an
+     anchor, button or tab, so none of the selectors above cover it — and
+     an invisible focus stop is worse than none, because the keyboard
+     scrolls a list the user cannot see they are on. */
+  .scroll-slim:focus-visible {
+    outline: 2px solid oklch(0.52 0.17 145);
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+  }
+
+  /* A capped list is only obvious as a list if the scrollbar is visible
+     when there is something to scroll to. Firefox takes scrollbar-width
+     and scrollbar-color; the ::-webkit pair covers the rest, and both are
+     scoped to the capped-list class so ordinary page scrollbars are
+     untouched. */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-stone-400) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background-color: var(--color-stone-400);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-stone-500);
+  }
+
   /* Respect the OS setting for CSS-driven animation too, not only
      framer-motion (handled by MotionConfig in providers.tsx). */
   @media (prefers-reduced-motion: reduce) {

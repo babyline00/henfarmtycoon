@@ -73,6 +73,7 @@ interface SecurityData {
 interface MiniGamesData {
   games: { id: string; key: string; name: string; emoji: string; description: string; enabled: boolean; energyCost: number; plays: number; wins: number; losses: number; rejected: number }[]
   totals: { totalPlays: number; coinsAwarded: number; xpAwarded: number; metersRan: number; playsToday: number; cheatedCount: number }
+  analytics: { gameKey: string; plays: number; wins: number; losses: number; winRate: number; uniquePlayers: number; playsPerPlayer: number; avgDurationSec: number; avgScore: number; avgCoins: number; avgXp: number; coinsPerMinute: number }[]
   cheated: { id: string; gameKey: string; createdAt: string; username: string; farmName: string; flagged: boolean }[]
   recent: { id: string; gameKey: string; username: string; avatar: string; score: number; distance: number; coins: number; result: string; cheated: boolean; createdAt: string }[]
   season: {
@@ -166,6 +167,14 @@ interface PayMethodDef { key: string; name: string; emoji: string; instructions:
 interface PayMethodAcc { enabled: boolean; [k: string]: unknown }
 
 const USD = (c: number) => `$${(c / 100).toFixed(2)}`
+
+// Per-game display names, keyed so a new game is a one-line addition
+// rather than another nested ternary in the table.
+const GAME_LABELS: Record<string, string> = {
+  chicken_run: '🏃 Chicken Run',
+  road_crossing: '🚦 Road Crossing',
+  egg_catch: '🥚 Egg Catch',
+}
 
 const PIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855f7', '#84cc16', '#ef4444']
 
@@ -462,7 +471,7 @@ export function AdminPanel() {
       </div>
 
       {/* tabs */}
-      <div className="flex gap-1 overflow-x-auto border-b border-stone-200 bg-white px-2 py-2" role="tablist" aria-label="Admin sections">
+      <div className="flex gap-1 overflow-x-auto border-b border-stone-200 bg-white px-2 py-2 lg:px-6 lg:py-2.5" role="tablist" aria-label="Admin sections">
         {TABS.map(([t, label]) => (
           <button key={t}
             role="tab"
@@ -478,11 +487,15 @@ export function AdminPanel() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 pb-8">
+      {/* The panel is full-screen at every size, so on a desktop the 2-column
+          dashboard stretched into two enormous cards with a single stat
+          each. The body is width-capped and the stat grid goes to 4 columns
+          from lg, which is what makes the numbers scannable side by side. */}
+      <div className="flex-1 overflow-y-auto p-3 pb-8 lg:p-6">
         {/* ════════ DASHBOARD ════════ */}
         {tab === 'dashboard' && (!stats ? <LoadingSpinner label="Loading platform data…" /> : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="mx-auto max-w-7xl space-y-3">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               <StatCard icon="👥" label="Total users" value={stats.stats.totalUsers} tone="green" sub={`+${stats.stats.newToday} today`} />
               <StatCard icon="🟢" label="Active today" value={stats.stats.activeToday} tone="teal" />
               <StatCard icon="🐔" label="Hens owned" value={stats.stats.totalHens} tone="amber" />
@@ -1249,6 +1262,56 @@ export function AdminPanel() {
                 ))}
               </div>
             </GameCard>
+
+            {/* per-game health — the panel showed flat lifetime counters,
+                which never answer "is this game actually any good" */}
+            {miniGames.analytics.length > 0 && (
+              <GameCard>
+                <p className="text-xs font-black text-stone-700">📈 Per-game health</p>
+                <p className="mt-0.5 text-[10px] text-stone-600">
+                  Win rate, typical run and payout per game. Coins/min is the honest
+                  read on whether a game is worth its energy cost.
+                </p>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-[520px] text-left text-[11px]">
+                    <thead>
+                      <tr className="border-b border-stone-200 text-[9px] font-black uppercase tracking-wide text-stone-600">
+                        <th scope="col" className="py-1 pr-2">Game</th>
+                        <th scope="col" className="py-1 pr-2 text-right">Plays</th>
+                        <th scope="col" className="py-1 pr-2 text-right">Players</th>
+                        <th scope="col" className="py-1 pr-2 text-right">Win %</th>
+                        <th scope="col" className="py-1 pr-2 text-right">Avg</th>
+                        <th scope="col" className="py-1 pr-2 text-right">Avg 🪙</th>
+                        <th scope="col" className="py-1 text-right">🪙/min</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {miniGames.analytics.map(a => (
+                        <tr key={a.gameKey} className="border-b border-stone-100 last:border-0">
+                          <th scope="row" className="py-1.5 pr-2 font-black text-stone-700">
+                            {GAME_LABELS[a.gameKey] ?? a.gameKey}
+                          </th>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-stone-700">{a.plays.toLocaleString()}</td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-stone-700">
+                            {a.uniquePlayers.toLocaleString()}
+                            <span className="ml-1 text-[9px] text-stone-500">×{a.playsPerPlayer}</span>
+                          </td>
+                          <td className={cn(
+                            'py-1.5 pr-2 text-right font-black tabular-nums',
+                            a.winRate >= 50 ? 'text-green-700' : a.winRate >= 20 ? 'text-amber-700' : 'text-red-700',
+                          )}>
+                            {a.winRate}
+                          </td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-stone-700">{a.avgScore.toLocaleString()}</td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-stone-700">{a.avgCoins.toLocaleString()}</td>
+                          <td className="py-1.5 text-right font-black tabular-nums text-stone-800">{a.coinsPerMinute.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </GameCard>
+            )}
 
             {/* cheat monitor */}
             {miniGames.cheated.length > 0 && (

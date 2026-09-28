@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 export function CoinPill({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' }) {
@@ -126,6 +127,103 @@ export function LoadingSpinner({ label = 'Loading...' }: { label?: string }) {
     <div className="flex flex-col items-center justify-center py-16" role="status" aria-live="polite">
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-green-200 border-t-green-600 motion-reduce:animate-none" aria-hidden="true" />
       <p className="mt-3 text-sm text-stone-600">{label}</p>
+    </div>
+  )
+}
+
+/**
+ * A long list, capped to `visible` rows with the rest behind a scrollbar.
+ *
+ * Leaderboards, history and alerts all had the same defect: they rendered
+ * every row, so the page grew without bound. A leaderboard with 400 scores
+ * pushed every other control off the screen, and transaction history could
+ * run to thousands of rows. The fix is not "show 5 and hide the rest" —
+ * that throws away data the player earned. It is a viewport: five rows
+ * visible, everything else one scroll away.
+ *
+ * Two details that are easy to get wrong and that this handles once:
+ *
+ * 1. A scroll container is not reachable by keyboard unless it is
+ *    focusable, so it gets `tabIndex={0}` and a label. But making *every*
+ *    list focusable is just as bad — a list of three rows becomes a tab
+ *    stop that scrolls nowhere. So focusability is decided by measuring
+ *    whether the content actually overflows, and it is re-measured when
+ *    the list or the window changes size.
+ * 2. Scroll chaining. When the list reaches its end, the page behind it
+ *    must keep scrolling — that is what `overscroll-contain` stops. On
+ *    touch it is the difference between the list feeling like a viewport
+ *    and feeling like a trap.
+ */
+export function ScrollList({
+  children,
+  count,
+  label,
+  visible = 5,
+  rowHeight = 46,
+  className,
+}: {
+  children: React.ReactNode
+  /** Total number of rows. Drives the overflow check and the "showing N" hint. */
+  count: number
+  /** Accessible name for the scrolling region. */
+  label: string
+  /** Rows visible before scrolling. */
+  visible?: number
+  /** Approximate row height in px, used to size the viewport. */
+  rowHeight?: number
+  className?: string
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [overflows, setOverflows] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1)
+    measure()
+    // A list that only scrolls after a late-loading child arrives (an
+    // avatar, a badge) would otherwise keep the wrong focusability.
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    return () => ro.disconnect()
+  }, [count, children])
+
+  useEffect(() => {
+    const onWinResize = () => {
+      const el = ref.current
+      if (el) setOverflows(el.scrollHeight - el.clientHeight > 1)
+    }
+    window.addEventListener('resize', onWinResize)
+    return () => window.removeEventListener('resize', onWinResize)
+  }, [])
+
+  return (
+    <div className={className}>
+      <div
+        ref={ref}
+        data-scrollable
+        tabIndex={overflows ? 0 : -1}
+        role={overflows ? 'group' : undefined}
+        aria-label={overflows ? label : undefined}
+        className={cn(
+          'scroll-slim space-y-1.5 pr-0.5',
+          // overflow-y-auto is load-bearing, not decoration: max-height on
+          // its own silently *clips* the overflow, which is the one
+          // outcome this component exists to avoid — rows 6+ would be
+          // unreachable rather than scrollable.
+          'overflow-y-auto',
+          overflows && 'overscroll-contain',
+        )}
+        style={{ maxHeight: visible * rowHeight }}
+      >
+        {children}
+      </div>
+      {overflows && (
+        <p className="mt-1.5 text-center text-[9px] font-bold text-stone-500">
+          Showing {visible} of {count} — scroll for more
+        </p>
+      )}
     </div>
   )
 }

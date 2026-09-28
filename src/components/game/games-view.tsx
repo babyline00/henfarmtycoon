@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { api, useGame } from '@/lib/store'
-import { GameCard, SectionTitle, LoadingSpinner, ProgressBar, EmptyState } from './shared'
+import { GameCard, SectionTitle, LoadingSpinner, ProgressBar, EmptyState, ScrollList } from './shared'
 import { ChickenRun } from './chicken-run'
 import { RoadCrossing } from './road-crossing'
 import { EggCatch } from './egg-catch'
@@ -308,25 +308,34 @@ export function GamesView() {
             {rows.length === 0 ? (
               <p className="py-3 text-center text-[11px] text-stone-600">No scores yet — be the first champion! 🐔</p>
             ) : (
-              <ol className="space-y-1.5">
-                {rows.map((r, i) => (
-                  <li key={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i === 0 && 'border border-amber-200 bg-amber-50', i === 1 && 'bg-stone-50', i === 2 && 'bg-orange-50/60')}>
-                    <span className="w-6 text-center text-xs font-black">{['🥇', '🥈', '🥉'][i] ?? `${i + 1}`}</span>
-                    <span className="text-lg" aria-hidden="true">{r.avatar}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] font-black text-stone-700">
-                        {r.username} {r.vip && '👑'}
-                      </p>
-                      <p className="truncate text-[9px] text-stone-600">{r.farmName}</p>
-                    </div>
-                    <span className="text-xs font-black tabular-nums text-purple-700">
-                      {g.key === 'chicken_run'
-                        ? (board === 'weekly' ? `${r.value}m` : `${r.value}`)
-                        : (board === 'weekly' ? `${r.value}m` : `${r.value} rd`)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              // Five rows, the rest one scroll away. A board of 200
+              // entries used to bury every other control on the page.
+              <ScrollList
+                count={rows.length}
+                label={`${g.name} ${BOARD_LABEL[board]} leaderboard`}
+                visible={5}
+                rowHeight={44}
+              >
+                <ol className="space-y-1.5">
+                  {rows.map((r, i) => (
+                    <li key={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i === 0 && 'border border-amber-200 bg-amber-50', i === 1 && 'bg-stone-50', i === 2 && 'bg-orange-50/60')}>
+                      <span className="w-6 text-center text-xs font-black">{['🥇', '🥈', '🥉'][i] ?? `${i + 1}`}</span>
+                      <span className="text-lg" aria-hidden="true">{r.avatar}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-black text-stone-700">
+                          {r.username} {r.vip && '👑'}
+                        </p>
+                        <p className="truncate text-[9px] text-stone-600">{r.farmName}</p>
+                      </div>
+                      <span className="text-xs font-black tabular-nums text-purple-700">
+                        {g.key === 'chicken_run'
+                          ? (board === 'weekly' ? `${r.value}m` : `${r.value}`)
+                          : (board === 'weekly' ? `${r.value}m` : `${r.value} rd`)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </ScrollList>
             )}
           </GameCard>
         )

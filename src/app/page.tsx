@@ -151,20 +151,112 @@ export default function Page() {
   const canDaily = state.user.canClaimDaily
   const socialBadge = state.pendingFriendRequests + state.user.claimableLevelRewards
 
-  return (
-    <div className="min-h-dvh bg-stone-200">
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-gradient-to-b from-lime-50 via-amber-50/40 to-green-50 shadow-2xl">
+  // The sidebar and the mobile bottom bar both render NAV, so the badge
+  // rule lives in one place. Duplicating it is how a desktop player ends
+  // up with a "2" on Social that the phone layout does not show.
+  const navBadge = (key: View): number =>
+    key === 'farm' ? readyEggs
+      : key === 'games' ? 0
+      : key === 'quests' ? claimable + (canDaily ? 1 : 0)
+      : key === 'social' ? socialBadge
+      : key === 'profile' ? state.user.claimableLevelRewards
+      : 0
 
-        {/* ── top bar ── */}
-        <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/85 px-3 py-2 backdrop-blur-md">
+  return (
+    // The app was a hard 448px column at every viewport size, so a desktop
+    // monitor showed a phone-width strip marooned in grey. Below lg it is
+    // still exactly that — the mobile layout is the design. From lg up the
+    // column becomes an app frame: a fixed sidebar on the left, the content
+    // filling the rest, and the bottom bar retired.
+    <div className="min-h-dvh bg-stone-200 lg:bg-stone-100">
+      <div className="relative mx-auto flex min-h-dvh w-full max-w-md flex-col bg-gradient-to-b from-lime-50 via-amber-50/40 to-green-50 shadow-2xl lg:max-w-6xl lg:flex-row lg:gap-0 lg:bg-none lg:shadow-none">
+
+        {/* ── desktop sidebar ──
+            `lg:` throughout: below lg this must not take a single pixel,
+            or it reintroduces the phone layout on a phone. */}
+        <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-stone-200 bg-white lg:flex">
+          <div className="flex items-center gap-2 border-b border-stone-200 px-4 py-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-lg">
+              <span aria-hidden="true">{state.user.avatar}</span>
+            </div>
+            {/* The sidebar already carries the farm name and level on
+                desktop, so keeping them here too meant the bar showed a
+                truncated duplicate of information 240px away. */}
+            <div className="min-w-0 flex-1 lg:hidden">
+              <p className="truncate text-xs font-black leading-tight text-stone-800">{state.user.farmName}</p>
+              <p className="text-[9px] font-bold leading-tight text-green-700">⭐ {state.user.levelName}</p>
+            </div>
+            {/* Desktop-only: a heading the sidebar cannot provide, so the
+                wide layout still has a title for the current view. */}
+            <h2 className="ml-2 hidden flex-1 text-sm font-black text-stone-800 lg:block">
+              {NAV.find(n => n.key === view)?.label}
+            </h2>
+          </div>
+
+          {/* The same badge rule the bottom bar uses, so the two never
+              disagree about what is waiting. */}
+          <nav aria-label="Primary" className="flex-1 space-y-0.5 overflow-y-auto p-2">
+            {NAV.map(n => {
+              const active = view === n.key
+              const badge = navBadge(n.key)
+              return (
+                <button key={n.key}
+                  onClick={() => setView(n.key)}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'relative flex w-full min-h-11 items-center gap-2.5 rounded-xl px-3 text-left transition-colors',
+                    active
+                      ? 'bg-green-50 font-black text-green-800'
+                      : 'font-bold text-stone-600 hover:bg-stone-100 hover:text-stone-800',
+                  )}
+                >
+                  {active && <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-green-600" />}
+                  <span aria-hidden="true" className={cn('text-xl', active && 'scale-110')}>{n.emoji}</span>
+                  <span className="text-xs">{n.label}</span>
+                  {badge > 0 && (
+                    <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-700 px-1 text-[9px] font-black leading-none text-white">
+                      <span className="sr-only">{badge} new</span>
+                      <span aria-hidden="true">{badge > 99 ? '99+' : badge}</span>
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="border-t border-stone-200 p-3">
+            <p className="text-[9px] font-black uppercase tracking-wide text-stone-500">Wallet</p>
+            <p className="mt-1 text-sm font-black tabular-nums text-amber-700">🪙 {state.user.coins.toLocaleString()}</p>
+            <p className="text-sm font-black tabular-nums text-pink-700">💎 {state.user.gems.toLocaleString()}</p>
+          </div>
+        </aside>
+
+        {/* ── content column ──
+            Wrapped so the header/main/nav can sit next to the sidebar as a
+            column while the sidebar keeps its own full-height track. */}
+        <div className="flex min-w-0 flex-1 flex-col bg-gradient-to-b from-lime-50 via-amber-50/40 to-green-50 lg:bg-transparent">
+
+        {/* ── top bar ──
+            The mobile bar stays: on desktop the sidebar already shows the
+            farm name, so the bar keeps only what is not duplicated — the
+            wallet and the alert bell. */}
+        <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-white/85 px-3 py-2 backdrop-blur-md lg:px-6 lg:py-3">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-lg">
               <span aria-hidden="true">{state.user.avatar}</span>
             </div>
-            <div className="min-w-0 flex-1">
+            {/* The sidebar already carries the farm name and level on
+                desktop, so keeping them here too meant the bar showed a
+                truncated duplicate of information 240px away. */}
+            <div className="min-w-0 flex-1 lg:hidden">
               <p className="truncate text-xs font-black leading-tight text-stone-800">{state.user.farmName}</p>
               <p className="text-[9px] font-bold leading-tight text-green-700">⭐ {state.user.levelName}</p>
             </div>
+            {/* Desktop-only: a heading the sidebar cannot provide, so the
+                wide layout still has a title for the current view. */}
+            <h2 className="ml-2 hidden flex-1 text-sm font-black text-stone-800 lg:block">
+              {NAV.find(n => n.key === view)?.label}
+            </h2>
             <div className="flex items-center gap-1">
               <span className="flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-black tabular-nums text-amber-800">
                 <span aria-hidden="true">🪙</span> {state.user.coins.toLocaleString()}
@@ -190,8 +282,11 @@ export default function Page() {
           </div>
         </header>
 
-        {/* ── content ── */}
-        <main className="flex-1 pb-24 pt-2">
+        {/* ── content ──
+            pb-24 clears the fixed bottom bar on mobile. On desktop that bar
+            is gone, so the extra 96px of dead space at the bottom of every
+            view is removed. */}
+        <main className="flex-1 pb-24 pt-2 lg:px-6 lg:pb-10">
           {/* The authenticated shell had no h1 at all, so assistive tech saw a
               flat run of section headings with no page boundary. */}
           <h1 className="sr-only">{state.user.farmName} — Hen Farm Tycoon</h1>
@@ -216,18 +311,12 @@ export default function Page() {
         {/* ── bottom nav ── */}
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
+          className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
         >
           <div className="mx-auto grid max-w-sm grid-cols-7">
             {NAV.map(n => {
               const active = view === n.key
-              const badge =
-                n.key === 'farm' ? readyEggs
-                  : n.key === 'games' ? 0
-                  : n.key === 'quests' ? claimable + (canDaily ? 1 : 0)
-                  : n.key === 'social' ? socialBadge
-                  : n.key === 'profile' ? state.user.claimableLevelRewards
-                  : 0
+              const badge = navBadge(n.key)
               return (
                 <button key={n.key}
                   onClick={() => setView(n.key)}
@@ -251,6 +340,7 @@ export default function Page() {
             })}
           </div>
         </nav>
+        </div>
 
         {/* ── flash toast ──
             The centering lives on a plain wrapper on purpose: framer-motion

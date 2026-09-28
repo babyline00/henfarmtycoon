@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useGame, api } from '@/lib/store'
 import { Button } from '@/components/ui/button'
-import { GameCard, EmptyState, SectionTitle, ProgressBar, ErrorState, LoadingSpinner } from './shared'
+import { GameCard, EmptyState, SectionTitle, ProgressBar, ErrorState, LoadingSpinner, ScrollList } from './shared'
 import { AudioSettings } from './audio-settings'
 import { SecurityCard } from './security-card'
 import { getMusicMood } from '@/lib/music'
@@ -39,6 +39,15 @@ export function ProfileView() {
   // so a player could not tell "no transactions yet" from "request failed".
   const [histError, setHistError] = useState<string | null>(null)
   const [histLoading, setHistLoading] = useState(false)
+
+  // Filtered once, above the JSX. The capped list needs the row count to
+  // decide whether it overflows, and deriving it inline in both the count
+  // prop and the map is how the "Showing N of M" hint drifts out of sync
+  // with what is actually rendered.
+  const filteredTxs = useMemo(
+    () => txs.filter(t => txFilter === 'all' || (txFilter === 'money' ? MONEY_TYPES.has(t.type) : !MONEY_TYPES.has(t.type))),
+    [txs, txFilter],
+  )
 
   useEffect(() => {
     if (!state) return
@@ -239,9 +248,17 @@ export function ProfileView() {
                 </button>
               ))}
             </div>
-            {txs
-              .filter(t => txFilter === 'all' || (txFilter === 'money' ? MONEY_TYPES.has(t.type) : !MONEY_TYPES.has(t.type)))
-              .map(t => (
+            {/* Transaction history is the one list that can be genuinely
+                huge — hundreds of buys, sells and game payouts. It used to
+                render every row, so the wallet page grew to thousands of
+                pixels and the filter buttons scrolled out of reach. */}
+            <ScrollList
+              count={filteredTxs.length}
+              label="Transaction history"
+              visible={5}
+              rowHeight={50}
+            >
+              {filteredTxs.map(t => (
                 <GameCard key={t.id} className="flex items-center gap-2 py-2">
                   <span className="text-lg" aria-hidden="true">{txIcon(t.type)}</span>
                   <div className="min-w-0 flex-1">
@@ -256,6 +273,7 @@ export function ProfileView() {
                   </span>
                 </GameCard>
               ))}
+            </ScrollList>
           </div>
         )
       )}
@@ -277,13 +295,20 @@ export function ProfileView() {
                 Mark all as read ({state.unreadNotifs})
               </Button>
             )}
-            {notifs.map(n => (
-              <GameCard key={n.id} className={cn('py-2.5', !n.read && 'border-l-4 border-l-green-600 bg-green-50/40')}>
-                <p className="text-xs font-black text-stone-800">{n.title}</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-stone-600">{n.body}</p>
-                <p className="mt-1 text-[9px] text-stone-600">{new Date(n.createdAt).toLocaleString()}</p>
-              </GameCard>
-            ))}
+            <ScrollList
+              count={notifs.length}
+              label="Notifications"
+              visible={5}
+              rowHeight={72}
+            >
+              {notifs.map(n => (
+                <GameCard key={n.id} className={cn('py-2.5', !n.read && 'border-l-4 border-l-green-600 bg-green-50/40')}>
+                  <p className="text-xs font-black text-stone-800">{n.title}</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-stone-600">{n.body}</p>
+                  <p className="mt-1 text-[9px] text-stone-600">{new Date(n.createdAt).toLocaleString()}</p>
+                </GameCard>
+              ))}
+            </ScrollList>
           </div>
         )
       )}
