@@ -29,7 +29,13 @@ export type SoundName =
   // game-specific: hen breeds (keys mirror HEN_TYPES)
   | 'hen_normal' | 'hen_golden' | 'hen_royal' | 'hen_magic'
   // game-specific: animals (keys mirror ANIMAL_TYPES + dragon reward)
-  | 'cow' | 'sheep' | 'duck' | 'dog' | 'cat' | 'horse' | 'dragon'
+  // Each species has more than one vocalisation — a cow that can only moo
+  // reads as a bleep, so the extra cues are what make it read as livestock.
+  | 'cow' | 'cow_low' | 'sheep' | 'sheep_bleat' | 'duck' | 'duck_whistle'
+  | 'dog' | 'dog_growl' | 'dog_whine' | 'cat' | 'cat_purr'
+  | 'horse' | 'horse_whinny' | 'dragon' | 'dragon_growl'
+  // ambience: the farm should sound alive between taps
+  | 'bird' | 'rooster' | 'cricket' | 'wind' | 'water'
   // game-specific: egg types (keys mirror EGG_TYPES)
   | 'egg_crack' | 'egg_golden' | 'egg_royal' | 'egg_magic' | 'egg_diamond' | 'egg_mystery'
   // game-specific: inventory items (keys mirror ITEM_TYPES)
@@ -118,7 +124,12 @@ const GAP_MS: Partial<Record<SoundName, number>> = {
   jump: 60,
   // game-specific spam guards: coop taps, arcade loops, traffic ticks
   hen_normal: 120, hen_golden: 120, hen_royal: 150, hen_magic: 150,
-  cow: 250, sheep: 250, duck: 200, dog: 180, cat: 220, horse: 250, dragon: 400,
+  cow: 250, cow_low: 300, sheep: 250, sheep_bleat: 250,
+  duck: 200, duck_whistle: 250, dog: 180, dog_growl: 300, dog_whine: 300,
+  cat: 220, cat_purr: 300, horse: 250, horse_whinny: 300,
+  dragon: 400, dragon_growl: 450,
+  // ambience fires on a timer; these gaps stop a burst overlapping itself
+  bird: 400, rooster: 600, cricket: 900, wind: 1200, water: 1200,
   egg_crack: 120, egg_golden: 150, egg_royal: 150, egg_magic: 150,
   egg_diamond: 200, egg_mystery: 200,
   item_medicine: 150, item_vitamin: 150, item_feed: 120, item_growth: 200,
@@ -135,6 +146,26 @@ let master: GainNode | null = null
 let throttle = createThrottle()
 let prefs: SoundPrefs = DEFAULTS
 let hydrated = false
+
+/** Notified whenever the preferences change, so a React control bound to
+ *  them stays in sync. See useSyncExternalStore in audio-settings.tsx. */
+const listeners = new Set<() => void>()
+
+function notify(): void {
+  for (const l of listeners) { try { l() } catch { /* a bad subscriber must not break audio */ } }
+}
+
+/** Subscribe to preference changes. Returns an unsubscribe function. */
+export function subscribeSoundPrefs(cb: () => void): () => void {
+  listeners.add(cb)
+  return () => { listeners.delete(cb) }
+}
+
+/** Stable snapshot object for useSyncExternalStore. */
+export function getSoundPrefsSnapshot(): SoundPrefs {
+  ensurePrefs()
+  return prefs
+}
 
 function ensurePrefs(): SoundPrefs {
   if (!hydrated) {
@@ -176,6 +207,7 @@ export function setSoundEnabled(on: boolean): void {
   prefs = { ...prefs, enabled: on }
   savePrefs(prefs)
   if (on) unlockAudio()
+  notify()
 }
 
 export function setVolume(v: number): void {
@@ -183,6 +215,7 @@ export function setVolume(v: number): void {
   prefs = { ...prefs, volume: clampVolume(v) }
   savePrefs(prefs)
   if (master) master.gain.value = prefs.volume
+  notify()
 }
 
 export function getSoundEnabled(): boolean {
@@ -243,6 +276,170 @@ function noise(c: AudioContext, out: AudioNode, opts: { dur: number; gain?: numb
   src.stop(t0 + opts.dur + 0.02)
 }
 
+// ── animal vocal synthesis ────────────────────────────────────
+// A raw oscillator at an animal's pitch does not read as that animal; what
+// makes a moo a moo is (a) a slow pitch *envelope* rather than a fixed
+// pitch, (b) a resonant formant around the vocal-tract frequency, and
+// (c) breath noise mixed under the tone. These three helpers are what let
+// the voices below be recognisable rather than decorative.
+
+/** Multi-point pitch envelope. Each entry is [timeFraction, semitones]. */
+type PitchCurve = [number, number][]
+
+/**
+ * A pitched vocalisation: oscillator + amplitude envelope + optional pitch
+ * curve, vibrato, growl modulation and a formant filter.
+ */
+function vocal(
+  c: AudioContext, out: AudioNode,
+  opts: {
+    dur: number
+    base: number
+    type?: OscillatorType
+    gain?: number
+    delay?: number
+    curve?: PitchCurve
+    /** vibrato depth in semitones and rate in Hz */
+    vibrato?: [number, number]
+    /** growl: low-frequency amplitude/roughness modulation */
+    growl?: [number, number]
+    /** resonant peak in Hz and its Q */
+    formant?: [number, number]
+    /** filtered noise mixed in, as [amount, cutoffHz] */
+    breath?: [number, number]
+  },
+): void {
+  const t0 = c.currentTime + (opts.delay ?? 0)
+  const dur = opts.dur
+  const gain = opts.gain ?? 0.16
+
+  const amp = c.createGain()
+  amp.gain.setValueAtTime(0.0001, t0)
+  amp.gain.exponentialRampToValueAtTime(gain, t0 + Math.min(0.06, dur * 0.2))
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+
+  let chain: AudioNode = amp
+
+  if (opts.formant) {
+    const bp = c.createBiquadFilter()
+    bp.type = 'bandpass'
+    bp.frequency.value = opts.formant[0]
+    bp.Q.value = opts.formant[1]
+    amp.connect(bp)
+    chain = bp
+  }
+
+  const osc = c.createOscillator()
+  osc.type = opts.type ?? 'sawtooth'
+  const hzAt = (f: number) => opts.base * Math.pow(2, f / 12)
+  osc.frequency.setValueAtTime(hzAt(opts.curve?.[0][1] ?? 0), t0)
+  for (const [frac, semi] of opts.curve ?? []) {
+    // skip the first point: setValueAtTime already placed it
+    if (frac === 0) continue
+    osc.frequency.linearRampToValueAtTime(hzAt(semi), t0 + dur * frac)
+  }
+  osc.connect(amp)
+  osc.start(t0)
+  osc.stop(t0 + dur + 0.03)
+
+  // breath: a band of noise shaped by the same amplitude envelope, which is
+  // what gives a bark or a bellow its "air"
+  if (opts.breath) {
+    const frames = Math.max(1, Math.floor(c.sampleRate * dur))
+    const buf = c.createBuffer(1, frames, c.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < frames; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / frames)
+    const src = c.createBufferSource()
+    src.buffer = buf
+    const hp = c.createBiquadFilter()
+    hp.type = 'bandpass'
+    hp.frequency.value = opts.breath[1]
+    hp.Q.value = 0.8
+    const bg = c.createGain()
+    bg.gain.value = opts.breath[0]
+    src.connect(hp); hp.connect(bg); bg.connect(amp)
+    src.start(t0); src.stop(t0 + dur + 0.02)
+  }
+
+  // growl: an LFO on the oscillator detune gives the roughness of a
+  // machine that is not a pure tone
+  if (opts.growl) {
+    const lfo = c.createOscillator()
+    const lfoGain = c.createGain()
+    lfo.frequency.value = opts.growl[0]
+    lfoGain.gain.value = opts.growl[1]
+    lfo.connect(lfoGain)
+    lfoGain.connect(osc.detune)
+    lfo.start(t0); lfo.stop(t0 + dur + 0.03)
+  }
+
+  // vibrato: slow pitch wobble, the difference between a "flat beep" and
+  // something alive
+  if (opts.vibrato) {
+    const lfo = c.createOscillator()
+    const lfoGain = c.createGain()
+    lfo.frequency.value = opts.vibrato[1]
+    lfoGain.gain.value = opts.vibrato[0] * 100 // detune is in cents
+    lfo.connect(lfoGain)
+    lfoGain.connect(osc.detune)
+    lfo.start(t0); lfo.stop(t0 + dur + 0.03)
+  }
+
+  chain.connect(out)
+}
+
+/** A short burst of band-passed noise — chirps, splashes, wing beats. */
+function chirp(
+  c: AudioContext, out: AudioNode,
+  opts: { from: number; to: number; dur: number; gain?: number; delay?: number; q?: number },
+): void {
+  const t0 = c.currentTime + (opts.delay ?? 0)
+  const frames = Math.max(1, Math.floor(c.sampleRate * opts.dur))
+  const buf = c.createBuffer(1, frames, c.sampleRate)
+  const d = buf.getChannelData(0)
+  for (let i = 0; i < frames; i++) {
+    // taper the noise so a sweep reads as a chirp, not a click
+    d[i] = (Math.random() * 2 - 1) * Math.sin((Math.PI * i) / frames)
+  }
+  const src = c.createBufferSource()
+  src.buffer = buf
+  const bp = c.createBiquadFilter()
+  bp.type = 'bandpass'
+  bp.Q.value = opts.q ?? 6
+  bp.frequency.setValueAtTime(opts.from, t0)
+  bp.frequency.exponentialRampToValueAtTime(Math.max(40, opts.to), t0 + opts.dur)
+  const amp = c.createGain()
+  amp.gain.setValueAtTime(0.0001, t0)
+  amp.gain.exponentialRampToValueAtTime(opts.gain ?? 0.1, t0 + opts.dur * 0.25)
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + opts.dur)
+  src.connect(bp); bp.connect(amp); amp.connect(out)
+  src.start(t0); src.stop(t0 + opts.dur + 0.02)
+}
+
+/** Repeating amplitude pulse train — purring, buzzing, insects. */
+function trill(
+  c: AudioContext, out: AudioNode,
+  opts: { freq: number; rate: number; dur: number; gain?: number; depth?: number; type?: OscillatorType; delay?: number },
+): void {
+  const t0 = c.currentTime + (opts.delay ?? 0)
+  const o = c.createOscillator()
+  o.type = opts.type ?? 'triangle'
+  o.frequency.value = opts.freq
+  const amp = c.createGain()
+  const peak = opts.gain ?? 0.09
+  amp.gain.setValueAtTime(0.0001, t0)
+  // pulse the amplitude at `rate` — this is the purr/buzz itself
+  const steps = Math.max(2, Math.round(opts.dur * opts.rate * 2))
+  for (let i = 0; i <= steps; i++) {
+    const at = t0 + (i / (opts.rate * 2))
+    if (at > t0 + opts.dur) break
+    amp.gain.exponentialRampToValueAtTime(i % 2 === 0 ? peak : peak * (opts.depth ?? 0.35), at)
+  }
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + opts.dur)
+  o.connect(amp); amp.connect(out)
+  o.start(t0); o.stop(t0 + opts.dur + 0.03)
+}
+
 // ── the voices ────────────────────────────────────────────────
 // Swap these bodies for AudioBufferSourceNode to move to real samples.
 const VOICES: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
@@ -266,14 +463,149 @@ const VOICES: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
   hen_golden: c => { tone(c, out(c), { freq: 990, dur: 0.07, type: 'square', gain: 0.1 }); tone(c, out(c), { freq: 1320, dur: 0.1, type: 'triangle', gain: 0.1, delay: 0.07 }) },
   hen_royal:  c => { [523.25, 659.25, 783.99].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.1, type: 'triangle', gain: 0.14, delay: i * 0.06 })) },
   hen_magic:  c => { tone(c, out(c), { freq: 400, dur: 0.28, type: 'sine', gain: 0.16, slideTo: 1200 }); tone(c, out(c), { freq: 1600, dur: 0.14, type: 'sine', gain: 0.08, delay: 0.2 }) },
-  // ── animals: cartoon approximations, one gesture each ──
-  cow:   c => { tone(c, out(c), { freq: 150, dur: 0.5, type: 'sawtooth', gain: 0.16, slideTo: 90 }) },
-  sheep: c => { tone(c, out(c), { freq: 380, dur: 0.16, type: 'square', gain: 0.11 }); tone(c, out(c), { freq: 360, dur: 0.16, type: 'square', gain: 0.1, delay: 0.14 }) },
-  duck:  c => { noise(c, out(c), { dur: 0.05, gain: 0.1, hp: 800 }); tone(c, out(c), { freq: 290, dur: 0.09, type: 'square', gain: 0.13 }); tone(c, out(c), { freq: 270, dur: 0.09, type: 'square', gain: 0.12, delay: 0.1 }) },
-  dog:   c => { noise(c, out(c), { dur: 0.06, gain: 0.14, hp: 900 }); tone(c, out(c), { freq: 360, dur: 0.09, type: 'square', gain: 0.14 }); tone(c, out(c), { freq: 340, dur: 0.09, type: 'square', gain: 0.13, delay: 0.11 }) },
-  cat:   c => { tone(c, out(c), { freq: 650, dur: 0.25, type: 'sine', gain: 0.15, slideTo: 950 }) },
-  horse: c => { tone(c, out(c), { freq: 720, dur: 0.4, type: 'sawtooth', gain: 0.11, slideTo: 300 }); noise(c, out(c), { dur: 0.18, gain: 0.08, hp: 600, delay: 0.05 }) },
-  dragon:c => { tone(c, out(c), { freq: 95, dur: 0.5, type: 'sawtooth', gain: 0.2, slideTo: 60 }); noise(c, out(c), { dur: 0.3, gain: 0.1, hp: 200, delay: 0.05 }); tone(c, out(c), { freq: 190, dur: 0.3, type: 'square', gain: 0.08, delay: 0.08 }) },
+  // ── animals: two real vocalisations per species ──
+  // cow — a long low moo that dips in the middle, with breath under it
+  cow: c => vocal(c, out(c), {
+    dur: 0.62, base: 132, type: 'sawtooth', gain: 0.17,
+    curve: [[0, 0], [0.22, 2], [0.55, -4], [0.85, -6], [1, -3]],
+    vibrato: [0.5, 5], formant: [720, 4], breath: [0.1, 900],
+  }),
+  // cow_low — the deeper bellow, slower and rougher
+  cow_low: c => vocal(c, out(c), {
+    dur: 0.95, base: 88, type: 'sawtooth', gain: 0.19,
+    curve: [[0, 0], [0.3, 3], [0.7, -5], [1, -2]],
+    growl: [22, 90], formant: [560, 5], breath: [0.12, 700],
+  }),
+  // sheep — baa: nasal, mid-register, vibrato carries the character
+  sheep: c => vocal(c, out(c), {
+    dur: 0.42, base: 310, type: 'square', gain: 0.13,
+    curve: [[0, 0], [0.3, 1.5], [1, -1]],
+    vibrato: [1.2, 11], formant: [1500, 7],
+  }),
+  // sheep_bleat — the short, rising, complaining bleat
+  sheep_bleat: c => vocal(c, out(c), {
+    dur: 0.26, base: 380, type: 'square', gain: 0.11,
+    curve: [[0, 0], [0.5, 3], [1, 5]],
+    vibrato: [1.6, 14], formant: [1700, 8],
+  }),
+  // duck — quack: a harsh buzz with the nasal wobble of a bill
+  duck: c => {
+    vocal(c, out(c), {
+      dur: 0.15, base: 300, type: 'sawtooth', gain: 0.13,
+      curve: [[0, 0], [0.4, -1], [1, -2]],
+      formant: [900, 3], breath: [0.14, 1200],
+    })
+    vocal(c, out(c), {
+      dur: 0.13, base: 275, type: 'sawtooth', gain: 0.12,
+      curve: [[0, 0], [1, -2]], formant: [820, 3], delay: 0.17,
+    })
+  },
+  // duck_whistle — the trailing rising "whrrk"
+  duck_whistle: c => vocal(c, out(c), {
+    dur: 0.3, base: 420, type: 'sine', gain: 0.11,
+    curve: [[0, 0], [0.6, 6], [1, 2]],
+    vibrato: [0.8, 16], breath: [0.06, 2000],
+  }),
+  // dog — bark: hard attack, a growl underneath, then a second pop
+  dog: c => {
+    vocal(c, out(c), {
+      dur: 0.13, base: 300, type: 'sawtooth', gain: 0.16,
+      curve: [[0, 0], [0.5, -3], [1, -5]],
+      growl: [40, 60], formant: [1100, 3], breath: [0.16, 1500],
+    })
+    vocal(c, out(c), {
+      dur: 0.1, base: 270, type: 'sawtooth', gain: 0.13,
+      curve: [[0, 0], [1, -4]], breath: [0.12, 1300], delay: 0.17,
+    })
+  },
+  // dog_growl — a low continuous rumble, for a guard dog on a border
+  dog_growl: c => vocal(c, out(c), {
+    dur: 0.75, base: 95, type: 'sawtooth', gain: 0.15,
+    curve: [[0, 0], [0.5, 1], [1, 0]],
+    growl: [26, 130], formant: [420, 6], breath: [0.08, 500],
+  }),
+  // dog_whine — the sad, rising whimper
+  dog_whine: c => vocal(c, out(c), {
+    dur: 0.44, base: 520, type: 'triangle', gain: 0.11,
+    curve: [[0, 0], [0.55, 5], [1, 3]],
+    vibrato: [1.1, 9], formant: [1300, 6],
+  }),
+  // cat — meow: the classic up-then-down contour is the whole identity
+  cat: c => vocal(c, out(c), {
+    dur: 0.5, base: 560, type: 'sawtooth', gain: 0.14,
+    curve: [[0, 0], [0.28, 5], [0.62, 4], [1, -4]],
+    vibrato: [0.7, 6], formant: [1000, 5], breath: [0.05, 1800],
+  }),
+  // cat_purr — a 25Hz amplitude trill with a low tone under it
+  cat_purr: c => {
+    trill(c, out(c), { freq: 105, rate: 25, dur: 1.0, gain: 0.1, depth: 0.3 })
+    trill(c, out(c), { freq: 210, rate: 25, dur: 1.0, gain: 0.04, depth: 0.5, delay: 0.02 })
+  },
+  // horse — neigh: a big inhale then a long falling cry
+  horse: c => {
+    noise(c, out(c), { dur: 0.14, gain: 0.09, hp: 1400 })
+    vocal(c, out(c), {
+      dur: 0.7, base: 380, type: 'sawtooth', gain: 0.15,
+      curve: [[0, 0], [0.18, 9], [0.6, 2], [1, -8]],
+      vibrato: [0.9, 11], formant: [1100, 3], breath: [0.07, 2000], delay: 0.1,
+    })
+  },
+  // horse_whinny — shorter, higher, a snort
+  horse_whinny: c => {
+    noise(c, out(c), { dur: 0.1, gain: 0.1, hp: 2200 })
+    vocal(c, out(c), {
+      dur: 0.34, base: 520, type: 'sawtooth', gain: 0.13,
+      curve: [[0, 0], [0.3, 6], [1, -4]],
+      vibrato: [1.3, 15], formant: [1400, 4], breath: [0.1, 2400], delay: 0.07,
+    })
+  },
+  // dragon — roar: very low, heavy, with the classic growl jitter
+  dragon: c => {
+    vocal(c, out(c), {
+      dur: 1.0, base: 70, type: 'sawtooth', gain: 0.2,
+      curve: [[0, 0], [0.25, 5], [0.7, -2], [1, -5]],
+      growl: [18, 150], formant: [380, 7], breath: [0.14, 600],
+    })
+    tone(c, out(c), { freq: 190, dur: 0.5, type: 'square', gain: 0.07, delay: 0.06 })
+  },
+  // dragon_growl — a low continuous threat, for the mutation moment
+  dragon_growl: c => vocal(c, out(c), {
+    dur: 1.3, base: 58, type: 'sawtooth', gain: 0.16,
+    curve: [[0, 0], [0.5, 2], [1, 0]],
+    growl: [14, 200], formant: [300, 8], breath: [0.1, 400],
+  }),
+  // ── ambience ──
+  // bird: two rising chirps
+  bird: c => {
+    chirp(c, out(c), { from: 2200, to: 3600, dur: 0.09, gain: 0.07 })
+    chirp(c, out(c), { from: 2600, to: 4200, dur: 0.1, gain: 0.06, delay: 0.15 })
+  },
+  // rooster: the dawn crow, three rising parts
+  rooster: c => {
+    vocal(c, out(c), {
+      dur: 0.34, base: 300, type: 'sawtooth', gain: 0.13,
+      curve: [[0, 0], [0.4, 7], [0.7, 4], [1, -6]],
+      growl: [30, 70], formant: [1000, 4], breath: [0.1, 1500],
+    })
+    vocal(c, out(c), {
+      dur: 0.28, base: 330, type: 'sawtooth', gain: 0.1,
+      curve: [[0, 0], [0.5, 5], [1, -5]],
+      formant: [1100, 4], breath: [0.08, 1400], delay: 0.42,
+    })
+  },
+  // cricket: a short high chirp, repeated
+  cricket: c => {
+    for (let i = 0; i < 3; i++) {
+      chirp(c, out(c), { from: 4200, to: 4600, dur: 0.035, gain: 0.05, delay: i * 0.07, q: 12 })
+    }
+  },
+  // wind: filtered noise swell
+  wind: c => noise(c, out(c), { dur: 1.6, gain: 0.05, hp: 400 }),
+  // water: a trickle
+  water: c => {
+    chirp(c, out(c), { from: 900, to: 2000, dur: 0.3, gain: 0.05, q: 2 })
+    chirp(c, out(c), { from: 1200, to: 800, dur: 0.25, gain: 0.04, delay: 0.34, q: 2 })
+  },
   // ── eggs: crack first, then a rarity shimmer ──
   egg_crack:  c => { noise(c, out(c), { dur: 0.12, gain: 0.18, hp: 2000 }); tone(c, out(c), { freq: 500, dur: 0.09, type: 'triangle', gain: 0.14, delay: 0.05 }) },
   egg_golden: c => { noise(c, out(c), { dur: 0.1, gain: 0.15, hp: 2200 }); tone(c, out(c), { freq: 880, dur: 0.12, type: 'triangle', gain: 0.15, delay: 0.05 }); tone(c, out(c), { freq: 1174.66, dur: 0.16, type: 'triangle', gain: 0.13, delay: 0.12 }) },

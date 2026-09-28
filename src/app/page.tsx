@@ -14,6 +14,9 @@ import { GamesView } from '@/components/game/games-view'
 import { AiAssistant } from '@/components/game/ai-assistant'
 import { AdminPanel } from '@/components/game/admin-panel'
 import { cn } from '@/lib/utils'
+import { setMusicMood, unlockMusic, stopMusic, startMusic } from '@/lib/music'
+import { startAmbience, stopAmbience } from '@/lib/ambience'
+import { moodForView, ambienceFromState, LOGIN_MOOD } from '@/lib/scene-audio'
 
 type View = 'farm' | 'games' | 'shop' | 'market' | 'social' | 'quests' | 'profile'
 
@@ -33,6 +36,33 @@ export default function Page() {
   const lastUnreadRef = useRef<number | null>(null)
 
   useEffect(() => { boot() }, [boot])
+
+  // ── audio direction ──
+  // Music tracks the screen you are on; the soundscape only runs on the
+  // farm, and only mixes in species the player actually owns.
+  useEffect(() => {
+    if (!state) { stopAmbience(); setMusicMood(LOGIN_MOOD); return }
+    setMusicMood(moodForView(view))
+  }, [view, state?.user.id])
+
+  useEffect(() => {
+    if (!state) return
+    if (view !== 'farm') { stopAmbience(); return }
+    startAmbience(ambienceFromState(state))
+    return () => stopAmbience()
+  }, [view, state?.user.id, state?.hens?.length, state?.animals?.length])
+
+  // Autoplay policy: audio may only start from a real gesture.
+  useEffect(() => {
+    if (!state) return
+    const onGesture = () => { unlockMusic(); startMusic() }
+    window.addEventListener('pointerdown', onGesture, { once: true })
+    window.addEventListener('keydown', onGesture, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+    }
+  }, [state?.user.id])
 
   // periodic refresh (production accumulates server-side)
   useEffect(() => {

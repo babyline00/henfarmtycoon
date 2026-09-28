@@ -31,6 +31,37 @@ export const ANIMAL_SOUNDS: Record<string, SoundName> = {
   horse: 'horse',
 }
 
+/**
+ * Every vocalisation each species can make. The first entry is the
+ * signature call used for taps and purchases; the rest are what the
+ * soundscape layer draws from so the farm does not sound like it has one
+ * cow that only ever says the same word.
+ */
+export const ANIMAL_VARIANTS: Record<string, SoundName[]> = {
+  cow: ['cow', 'cow_low'],
+  sheep: ['sheep', 'sheep_bleat'],
+  duck: ['duck', 'duck_whistle'],
+  dog: ['dog', 'dog_growl', 'dog_whine'],
+  cat: ['cat', 'cat_purr'],
+  horse: ['horse', 'horse_whinny'],
+  dragon: ['dragon', 'dragon_growl'],
+}
+
+export const DEFAULT_ANIMAL_VARIANTS: SoundName[] = ['collect']
+
+/** Nth vocalisation of a species, wrapping. Unknown species → 'collect'. */
+export function soundForAnimalVariant(typeKey: string, variant = 0): SoundName {
+  const list = ANIMAL_VARIANTS[typeKey] ?? DEFAULT_ANIMAL_VARIANTS
+  if (list.length === 0) return 'collect'
+  const i = Number.isFinite(variant) ? Math.abs(Math.trunc(variant)) : 0
+  return list[i % list.length]
+}
+
+/** Every species that has a voice, for the soundscape layer. */
+export function animalSpeciesWithVoices(): string[] {
+  return Object.keys(ANIMAL_VARIANTS)
+}
+
 export const EGG_SOUNDS: Record<string, SoundName> = {
   normal: 'egg_crack',
   golden: 'egg_golden',

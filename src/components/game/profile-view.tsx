@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useGame, api } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { GameCard, EmptyState, SectionTitle, ProgressBar, ErrorState, LoadingSpinner } from './shared'
+import { AudioSettings } from './audio-settings'
+import { getMusicMood } from '@/lib/music'
 import { SupportCenter } from './support-center'
 import { WalletView } from './wallet-view'
 import { cn } from '@/lib/utils'
@@ -144,40 +146,7 @@ export function ProfileView() {
       )}
 
       {/* ── level milestone rewards (Phase 9) ── */}
-      <SectionTitle right={
-        user.claimableLevelRewards > 0 ? (
-          <Button size="sm"
-            onClick={() => act('claim_level_reward')}
-            disabled={loading}
-            className="min-h-9 rounded-full bg-purple-700 px-3 text-xs font-extrabold text-white shadow active:scale-95"
-          >
-            🎁 Claim ({user.claimableLevelRewards})
-          </Button>
-        ) : undefined}>
-        ⭐ Level Milestones
-      </SectionTitle>
-      <div className="space-y-1.5">
-        {user.levelRewards.map(rw => (
-          <GameCard key={rw.level} className={cn(
-            'flex items-center gap-2 py-2',
-            rw.reached && !rw.claimed && 'border-purple-400 bg-purple-50/50',
-          )}>
-            <span className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black',
-              rw.claimed ? 'bg-green-100 text-green-700' : rw.reached ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-600',
-            )}>
-              {rw.claimed ? '✓' : `L${rw.level}`}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className={cn('text-xs font-black', rw.reached ? 'text-stone-700' : 'text-stone-600')}>
-                Level {rw.level} {rw.unlock ? `· ${rw.unlock}` : ''}
-              </p>
-              <p className="text-[10px] text-stone-600">🪙 {rw.coins.toLocaleString()}{rw.gems ? ` + 💎 ${rw.gems}` : ''}</p>
-            </div>
-            {!rw.reached && <span className="text-[10px] font-bold text-stone-600">🔒 locked</span>}
-          </GameCard>
-        ))}
-      </div>
+     
 
       {/* ── wallet cards ── */}
       <div className="grid grid-cols-2 gap-2">
@@ -320,6 +289,46 @@ export function ProfileView() {
 
       {/* ── support center (Phase 25) ── */}
       {tab === 'support' && <SupportCenter />}
+
+       <SectionTitle right={
+        user.claimableLevelRewards > 0 ? (
+          <Button size="sm"
+            onClick={() => act('claim_level_reward')}
+            disabled={loading}
+            className="min-h-9 rounded-full bg-purple-700 px-3 text-xs font-extrabold text-white shadow active:scale-95"
+          >
+            🎁 Claim ({user.claimableLevelRewards})
+          </Button>
+        ) : undefined}>
+        ⭐ Level Milestones
+      </SectionTitle>
+      <div className="space-y-1.5">
+        {user.levelRewards.map(rw => (
+          <GameCard key={rw.level} className={cn(
+            'flex items-center gap-2 py-2',
+            rw.reached && !rw.claimed && 'border-purple-400 bg-purple-50/50',
+          )}>
+            <span className={cn(
+              'flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black',
+              rw.claimed ? 'bg-green-100 text-green-700' : rw.reached ? 'bg-purple-100 text-purple-700' : 'bg-stone-100 text-stone-600',
+            )}>
+              {rw.claimed ? '✓' : `L${rw.level}`}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className={cn('text-xs font-black', rw.reached ? 'text-stone-700' : 'text-stone-600')}>
+                Level {rw.level} {rw.unlock ? `· ${rw.unlock}` : ''}
+              </p>
+              <p className="text-[10px] text-stone-600">🪙 {rw.coins.toLocaleString()}{rw.gems ? ` + 💎 ${rw.gems}` : ''}</p>
+            </div>
+            {!rw.reached && <span className="text-[10px] font-bold text-stone-600">🔒 locked</span>}
+          </GameCard>
+        ))}
+      </div>
+
+
+      {/* ── audio ── */}
+      <SectionTitle>🔊 Audio</SectionTitle>
+      <AudioSettings currentMood={getMusicMood()} />
 
       {/* ── actions ── */}
       <SectionTitle>⚙️ Account</SectionTitle>

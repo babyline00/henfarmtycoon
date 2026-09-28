@@ -1,8 +1,12 @@
 'use client'
 
 import { create } from 'zustand'
-import { play, unlockAudio } from './sfx'
+import { play, unlockAudio, type SoundName } from './sfx'
 import { soundForAction, soundForHatchResult } from './game-sounds'
+import { duckMusic } from './music'
+
+/** Cues loud enough that the music should step back for them. */
+const LOUD_CUES = new Set<SoundName>(['levelup', 'win', 'reward', 'hatch', 'dragon', 'dragon_growl', 'daily', 'mission', 'gift'])
 
 // ── types (mirror of server payload) ─────────────────────────
 
@@ -285,6 +289,8 @@ export const useGame = create<Store>((set, get) => ({
       await get().refresh()
       if (res.hatch) {
         set({ hatchResult: res.hatch })
+        // Pull the soundtrack down so the hatch fanfare is not buried under it.
+        duckMusic(1800)
         play(soundForHatchResult(res.hatch))
       } else {
         if (res.message) {
@@ -298,7 +304,11 @@ export const useGame = create<Store>((set, get) => ({
           subType: typeof payload.subType === 'string' ? payload.subType : undefined,
           itemKey: typeof payload.itemKey === 'string' ? payload.itemKey : undefined,
         })
-        if (cue) play(cue)
+        if (cue) {
+          // The big celebratory cues get the music out of their way.
+          if (LOUD_CUES.has(cue)) duckMusic(1200)
+          play(cue)
+        }
       }
       return res
     } catch (e) {
