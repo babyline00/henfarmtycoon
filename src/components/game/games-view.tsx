@@ -1,110 +1,172 @@
 'use client'
 
-import{ useCallback, useEffect, useState} from'react'
-import{ motion} from'framer-motion'
-import{ api, useGame} from'@/lib/store'
-import{ GameCard, SectionTitle, LoadingSpinner, ProgressBar} from'./shared'
-import{ ChickenRun} from'./chicken-run'
-import{ RoadCrossing} from'./road-crossing'
-import{ cn} from'@/lib/utils'
+import { useCallback, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import { api, useGame } from '@/lib/store'
+import { GameCard, SectionTitle, LoadingSpinner, ProgressBar, EmptyState } from './shared'
+import { ChickenRun } from './chicken-run'
+import { RoadCrossing } from './road-crossing'
+import { cn } from '@/lib/utils'
 
-//══════════ Phase 33— MiniGamesHub══════════
+// ══════════ Phase 33 — Mini Games Hub ══════════
 
-interface EnergyState{
-  energy:number; max:number; regenPerHour: number; nextEnergyInSec:number; vipFast: boolean}
-interface TierInfo{
-  key:string; name:string; reqLevel:number; mult: number desc:string; current:boolean; locked: boolean}
-interface GameView{
-  id:string; key:string; name:string; emoji:string; description: string enabled:boolean; energyCost:number; winTarget: number; myBestScore:number; myBestDistance:number; totalPlays: number}
-interface BoardRow{ userId:string; username:string; avatar:string; farmName:string; vip:boolean; value: number}
-interface HubData{
-  energy:EnergyState tier: number; tierInfo:TierInfo[]seasonRewards:{ rank:number; prize:string; emoji:string; detail: string}[] games:GameView[] leaderboards:Record<string, { daily:BoardRow[]; weekly:BoardRow[]; monthly:BoardRow[]}>
-  recentSessions:{ id:string; gameKey:string; score:number; distance:number; coins:number; eggs:number; gems:number; xp:number; result:string; createdAt: string}[] stats:{ totalGames:number; wins:number; losses:number; highestScore:number; bestDistance:number; totalRewards:number; playTimeSec: number}
-  arcadeRewardsEnabled: boolean}
+interface EnergyState {
+  energy: number
+  max: number
+  regenPerHour: number
+  nextEnergyInSec: number
+  vipFast: boolean
+}
+interface TierInfo {
+  key: string
+  name: string
+  reqLevel: number
+  mult: number
+  desc: string
+  current: boolean
+  locked: boolean
+}
+interface GameView {
+  id: string
+  key: string
+  name: string
+  emoji: string
+  description: string
+  enabled: boolean
+  energyCost: number
+  winTarget: number
+  myBestScore: number
+  myBestDistance: number
+  totalPlays: number
+}
+interface BoardRow { userId: string; username: string; avatar: string; farmName: string; vip: boolean; value: number }
+interface HubData {
+  energy: EnergyState
+  tier: number
+  tierInfo: TierInfo[]
+  seasonRewards: { rank: number; prize: string; emoji: string; detail: string }[]
+  games: GameView[]
+  leaderboards: Record<string, { daily: BoardRow[]; weekly: BoardRow[]; monthly: BoardRow[] }>
+  recentSessions: { id: string; gameKey: string; score: number; distance: number; coins: number; eggs: number; gems: number; xp: number; result: string; createdAt: string }[]
+  stats: { totalGames: number; wins: number; losses: number; highestScore: number; bestDistance: number; totalRewards: number; playTimeSec: number }
+  arcadeRewardsEnabled: boolean
+}
 
-export interface FinishResult{
-  ok?: boolean; rejected?: boolean; reason?: string; result?: string; coins?:number; eggs?:number; gems?:number; xp?: number; duration?: number; lines?: string[]mysteryItems?: string[]championBuff?: boolean; message?: string}
+export interface FinishResult {
+  ok?: boolean
+  rejected?: boolean
+  reason?: string
+  result?: string
+  coins?: number
+  eggs?: number
+  gems?: number
+  xp?: number
+  duration?: number
+  lines?: string[]
+  mysteryItems?: string[]
+  championBuff?: boolean
+  message?: string
+}
 
-type ActiveGame= { key:'chicken_run' | 'road_crossing'; sessionId:string; tier:number; tierName:string; tierMult:number; speedMult:number; winTarget: number} | null const GAME_META:Record<string, { controls:string[]; objective: string}> = {
-  chicken_run:{
-    controls:['⬅️➡️ swipe / arrows= switchlane', '⬆️ swipe / space= jump', 'Jump clearsrocks, barriers& dogs— not cars& trees'],
-    objective:'Run 1000m towin! Collect🥚🪙💎🎁 on theway.',
+type ActiveGame = {
+  key: 'chicken_run' | 'road_crossing'
+  sessionId: string
+  tier: number
+  tierName: string
+  tierMult: number
+  speedMult: number
+  winTarget: number
+} | null
+
+const GAME_META: Record<string, { controls: string[]; objective: string }> = {
+  chicken_run: {
+    controls: ['⬅️➡️ swipe / arrows = switch lane', '⬆️ swipe / space = jump', 'Jump clears rocks, barriers & dogs — not cars & trees'],
+    objective: 'Run 1000m to win! Collect 🥚🪙💎🎁 on the way.',
   },
-  road_crossing:{
-    controls:['⬆️⬇️⬅️➡️ swipe / arrows= hop', '🛡️ shield· 🧲 magnet· ⚡ speed· ❄️ freeze'],
-    objective:'Cross 12 roads to reach the farmside!',
+  road_crossing: {
+    controls: ['⬆️⬇️⬅️➡️ swipe / arrows = hop', '🛡️ shield · 🧲 magnet · ⚡ speed · ❄️ freeze'],
+    objective: 'Cross 12 roads to reach the farm side!',
   },
 }
 
-export function GamesView() {
-  const{ showFlash, refresh} = useGame()
-  const [hub, setHub]= useState<HubData| null>(null)
-  const [board, setBoard]= useState<'daily' | 'weekly' | 'monthly'>('daily')
-  const [active, setActive]= useState<ActiveGame>(null)
-  const [result, setResult]= useState<FinishResult| null>(null)
-  const [starting, setStarting]= useState<string| null>(null)
-  const [tick, setTick]= useState(0)
+const BOARD_LABEL = {
+  daily: 'Top score (today)',
+  weekly: 'Most distance (7d)',
+  monthly: 'Champion farmer (month)',
+} as const
 
-  const load= useCallback(async() => {
-    try{
+export function GamesView() {
+  const { showFlash, refresh } = useGame()
+  const [hub, setHub] = useState<HubData | null>(null)
+  const [board, setBoard] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [active, setActive] = useState<ActiveGame>(null)
+  const [result, setResult] = useState<FinishResult | null>(null)
+  const [starting, setStarting] = useState<string | null>(null)
+  const [tick, setTick] = useState(0)
+
+  const load = useCallback(async () => {
+    try {
       setHub(await api<HubData>('/api/mini'))
-    } catch(e) {
-      showFlash(e instanceof Error? e.message :'Failed to loadarcade', 'error')
+    } catch (e) {
+      showFlash(e instanceof Error ? e.message : 'Failed to load arcade', 'error')
     }
   }, [showFlash])
 
   useEffect(() => { load() }, [load])
-  // energy tickeruseEffect(() => {
-    const t= setInterval(() => setTick(x=> x+ 1), 1000)
-    return() => clearInterval(t)
+
+  // energy ticker — re-renders once a second so the countdown advances
+  useEffect(() => {
+    const t = setInterval(() => setTick(x => x + 1), 1000)
+    return () => clearInterval(t)
   }, [])
 
-  async function startGame(game:GameView) {
-    if(starting) return setStarting(game.key)
-    try{
-      const res= await api<ActiveGame& { ok: boolean}>('/api/mini', {
-        method:'POST',
-        body:{ action:'start', gameKey: game.key},
+  async function startGame(game: GameView) {
+    if (starting) return
+    setStarting(game.key)
+    try {
+      const res = await api<ActiveGame & { ok: boolean }>('/api/mini', {
+        method: 'POST',
+        body: { action: 'start', gameKey: game.key },
       })
       setActive({
-        key: game.key as'chicken_run' | 'road_crossing',
-        sessionId:res.sessionId!, tier:res.tier!, tierName:res.tierName!,
-        tierMult:res.tierMult!, speedMult:res.speedMult!, winTarget:res.winTarget!,
+        key: game.key as 'chicken_run' | 'road_crossing',
+        sessionId: res.sessionId!, tier: res.tier!, tierName: res.tierName!,
+        tierMult: res.tierMult!, speedMult: res.speedMult!, winTarget: res.winTarget!,
       })
-    } catch(e) {
-      showFlash(e instanceof Error? e.message :'Cannot startgame', 'error')
-    } finally{
+    } catch (e) {
+      showFlash(e instanceof Error ? e.message : 'Cannot start game', 'error')
+    } finally {
       setStarting(null)
     }
   }
 
-  const finishGame= useCallback(async(sessionId:string, telemetry:Record<string, number>) => {
-    try{
-      const res= await api<FinishResult>('/api/mini', {
-        method:'POST',
-        body:{ action:'finish', sessionId, ...telemetry},
+  const finishGame = useCallback(async (sessionId: string, telemetry: Record<string, number>) => {
+    try {
+      const res = await api<FinishResult>('/api/mini', {
+        method: 'POST',
+        body: { action: 'finish', sessionId, ...telemetry },
       })
       setResult(res)
-      if(res.rejected) showFlash(res.message?? 'Resultrejected', 'error')
+      if (res.rejected) showFlash(res.message ?? 'Result rejected', 'error')
       refresh()
-    } catch(e) {
-      showFlash(e instanceof Error? e.message :'Failed to submitresult', 'error')
-    } finally{
+    } catch (e) {
+      showFlash(e instanceof Error ? e.message : 'Failed to submit result', 'error')
+    } finally {
       setActive(null)
       load()
     }
   }, [load, refresh, showFlash])
 
-  if(active) {
-    if(active.key=== 'chicken_run') {
-      return<ChickenRunsessi onId={active.sessionId}
+  if (active) {
+    if (active.key === 'chicken_run') {
+      return <ChickenRun sessionId={active.sessionId}
         tier={active.tier} tierName={active.tierName}
         speedMult={active.speedMult} winTarget={active.winTarget}
         onEnd={(tel) => finishGame(active.sessionId, tel)}
         onQuit={() => setActive(null)}
       />
     }
-    return<RoadCrossingsessi onId={active.sessionId}
+    return <RoadCrossing sessionId={active.sessionId}
       tier={active.tier} tierName={active.tierName}
       speedMult={active.speedMult} winTarget={active.winTarget}
       onEnd={(tel) => finishGame(active.sessionId, tel)}
@@ -112,232 +174,246 @@ export function GamesView() {
     />
   }
 
-  if(!hub) return<LoadingSpinnerlabel="Booting thearcade..." />
+  if (!hub) return <LoadingSpinner label="Booting the arcade…" />
 
-  const e= hub.energy const energyPct= (e.energy /e.max) * 100 void tick // re-render every second to advance countdown return(
+  const e = hub.energy
+  const energyPct = (e.energy / e.max) * 100
+  void tick // re-render every second to advance the countdown
+
+  return (
     <div className="px-3 pb-4">
-      <Secti onTitleright={
-        <span className="rounded-full bg-purple-100 border border-purple-300 px-2 py-0.5 text-[10px] font-blacktext-purple-700">
-          TIER:{hub.tierInfo[hub.tier]?.name?? 'Farm'} ×{hub.tierInfo[hub.tier]?.mult?? 1}
+      <SectionTitle right={
+        <span className="rounded-full border border-purple-300 bg-purple-100 px-2 py-0.5 text-[10px] font-black text-purple-700">
+          TIER: {hub.tierInfo[hub.tier]?.name ?? 'Farm'} ×{hub.tierInfo[hub.tier]?.mult ?? 1}
         </span>
-      }>🎮 MiniGamesHub</SectionTitle>
+      }>🎮 Mini Games Hub</SectionTitle>
 
-      {/* ── energy card── */}
+      {/* ── energy card ── */}
       <GameCard className="mb-3">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-blacktext-stone-800">⚡ ArcadeEnergy</p>
-            <p className="text-[10px]text-stone-500">
-              +{e.regenPerHour}/hour{e.vipFast? ' · 👑 VIP ×2boost' :''}
+            <p className="text-sm font-black text-stone-800">⚡ Arcade Energy</p>
+            <p className="text-[10px] text-stone-500">
+              +{e.regenPerHour}/hour{e.vipFast ? ' · 👑 VIP ×2 boost' : ''}
             </p>
           </div>
-          <p className="text-lg font-black tabular-numstext-purple-700">{e.energy}/{e.max}</p>
+          <p className="text-lg font-black tabular-nums text-purple-700">{e.energy}/{e.max}</p>
         </div>
-        <ProgressBarpct={energyPct} className="mt-2" />
-        {e.energy< e.max&& (
-          <p className="mt-1 text-right text-[10px] font-bold text-stone-600tabular-nums">
-            next⚡ in{Math.floor(e.nextEnergyInSec /60)}:{String(e.nextEnergyInSec% 60).padStart(2, '0')}
+        <ProgressBar pct={energyPct} label="Arcade energy" className="mt-2" />
+        {e.energy < e.max && (
+          <p className="mt-1 text-right text-[10px] font-bold tabular-nums text-stone-600">
+            next ⚡ in {Math.floor(e.nextEnergyInSec / 60)}:{String(e.nextEnergyInSec % 60).padStart(2, '0')}
           </p>
         )}
       </GameCard>
 
-      {/* ── game cards── */}
-      {hub.games.map(g=> {
-        const meta= GAME_META[g.key]?? { controls:[], objective:'' }
-        return(
-          <GameCard key={g.id} className={cn('mb-3', !g.enabled&& 'opacity-60')}>
+      {/* ── game cards ── */}
+      {hub.games.length === 0 ? (
+        <GameCard className="mb-3">
+          <EmptyState emoji="🎮" title="No games enabled" sub="The arcade is closed right now — check back later" />
+        </GameCard>
+      ) : hub.games.map(g => {
+        const meta = GAME_META[g.key] ?? { controls: [], objective: '' }
+        const affordable = hub.energy.energy >= g.energyCost
+        return (
+          <GameCard key={g.id} className={cn('mb-3', !g.enabled && 'opacity-60')}>
             <div className="flex items-start gap-3">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100text-3xl">
-                {g.emoji}
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-stone-100 text-3xl">
+                <span aria-hidden="true">{g.emoji}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-blacktext-stone-800">{g.name}</p>
-                  <span className="rounded-full bg-amber-100 border border-amber-300 px-1.5 py-0.5 text-[9px] font-blacktext-amber-700">⚡{g.energyCost}</span>
-                  {!g.enabled&& <span className="rounded-full bg-red-100 border border-red-300 px-1.5 py-0.5 text-[9px] font-blacktext-red-600">OFFLINE</span>}
+                  <p className="text-sm font-black text-stone-800">{g.name}</p>
+                  <span className="rounded-full border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-700">⚡{g.energyCost}</span>
+                  {!g.enabled && <span className="rounded-full border border-red-300 bg-red-100 px-1.5 py-0.5 text-[9px] font-black text-red-600">OFFLINE</span>}
                 </div>
-                <p className="mt-0.5 text-[11px] leading-snugtext-stone-500">{g.description}</p>
-                <p className="mt-1 text-[10px] font-boldtext-green-700">🎯 {meta.objective}</p>
-                <div className="mt-1 flex gap-3 text-[10px] font-boldtext-stone-500">
-                  <span>🏅 Best:{g.key=== 'chicken_run' ? `${g.myBestDistance}m` :`${g.myBestScore} roads`}</span>
+                <p className="mt-0.5 text-[11px] leading-snug text-stone-600">{g.description}</p>
+                <p className="mt-1 text-[10px] font-bold text-green-700">🎯 {meta.objective}</p>
+                <div className="mt-1 flex gap-3 text-[10px] font-bold text-stone-600">
+                  <span>🏅 Best: {g.key === 'chicken_run' ? `${g.myBestDistance}m` : `${g.myBestScore} roads`}</span>
                   <span>🌍 {g.totalPlays.toLocaleString()} plays</span>
                 </div>
               </div>
             </div>
-            <ul className="mt-2 space-y-0.5 rounded-xl bg-stone-50  p-2">
-              {meta.controls.map((c, i) => <li key={i} className="text-[10px]text-stone-500">{c}</li>)}
+            <ul className="mt-2 space-y-0.5 rounded-xl bg-stone-50 p-2">
+              {meta.controls.map((c, i) => <li key={i} className="text-[10px] text-stone-600">{c}</li>)}
             </ul>
             <button onClick={() => startGame(g)}
-              disabled={starting=== g.key|| !g.enabled|| hub.energy.energy< g.energyCost}
+              disabled={starting === g.key || !g.enabled || !affordable}
               className={cn(
-                'mt-2 h-11 w-full rounded-2xl text-sm font-extrabold text-white shadow-lg transition-allactive:scale-95',
-                'bg-gradient-to-r from-purple-600to-fuchsia-600',
-                (!g.enabled|| hub.energy.energy< g.energyCost) && 'from-stone-400to-stone-400'
+                'mt-2 h-11 w-full rounded-2xl text-sm font-extrabold text-white shadow-lg transition-all active:scale-95 disabled:opacity-50',
+                (!g.enabled || !affordable) ? 'bg-stone-400' : 'bg-gradient-to-r from-purple-700 to-fuchsia-700',
               )}
             >
-              {starting=== g.key? 'Loading...' :!g.enabled? 'Unavailable' : hub.energy.energy< g.energyCost? `Need⚡${g.energyCost}` :`▶ PlayNow(⚡${g.energyCost})`}
+              {starting === g.key ? 'Loading…' : !g.enabled ? 'Unavailable' : !affordable ? `Need ⚡${g.energyCost}` : `▶ Play Now (⚡${g.energyCost})`}
             </button>
           </GameCard>
         )
       })}
 
-      {/* ── my arcade stats── */}
-      <Secti onTitle>📊 MyArcadeStats</SectionTitle>
+      {/* ── my arcade stats ── */}
+      <SectionTitle>📊 My Arcade Stats</SectionTitle>
       <GameCard className="mb-3">
-        <div className="grid grid-cols-3 gap-2text-center">
-          <div><p className="text-lg font-black text-stone-800tabular-nums">{hub.stats.totalGames}</p><p className="text-[9px] font-bold uppercasetext-stone-600">Games</p></div>
-          <div><p className="text-lg font-black text-green-600tabular-nums">{hub.stats.wins}</p><p className="text-[9px] font-bold uppercasetext-stone-600">Wins</p></div>
-          <div><p className="text-lg font-black text-amber-600tabular-nums">{hub.stats.totalRewards.toLocaleString()}</p><p className="text-[9px] font-bold uppercasetext-stone-600">🪙 Won</p></div>
-          <div><p className="text-lg font-black text-purple-600tabular-nums">{hub.stats.highestScore}</p><p className="text-[9px] font-bold uppercasetext-stone-600">HighScore</p></div>
-          <div><p className="text-lg font-black text-teal-600tabular-nums">{hub.stats.bestDistance}m</p><p className="text-[9px] font-bold uppercasetext-stone-600">BestRun</p></div>
-          <div><p className="text-lg font-black text-stone-600tabular-nums">{Math.round(hub.stats.playTimeSec /60)}m</p><p className="text-[9px] font-bold uppercasetext-stone-600">PlayTime</p></div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div><p className="text-lg font-black tabular-nums text-stone-800">{hub.stats.totalGames}</p><p className="text-[9px] font-bold uppercase text-stone-600">Games</p></div>
+          <div><p className="text-lg font-black tabular-nums text-green-700">{hub.stats.wins}</p><p className="text-[9px] font-bold uppercase text-stone-600">Wins</p></div>
+          <div><p className="text-lg font-black tabular-nums text-amber-700">{hub.stats.totalRewards.toLocaleString()}</p><p className="text-[9px] font-bold uppercase text-stone-600">🪙 Won</p></div>
+          <div><p className="text-lg font-black tabular-nums text-purple-700">{hub.stats.highestScore}</p><p className="text-[9px] font-bold uppercase text-stone-600">High score</p></div>
+          <div><p className="text-lg font-black tabular-nums text-teal-700">{hub.stats.bestDistance}m</p><p className="text-[9px] font-bold uppercase text-stone-600">Best run</p></div>
+          <div><p className="text-lg font-black tabular-nums text-stone-600">{Math.round(hub.stats.playTimeSec / 60)}m</p><p className="text-[9px] font-bold uppercase text-stone-600">Play time</p></div>
         </div>
       </GameCard>
 
-      {/* ── leaderboards── */}
-      <Secti onTitleright={
-        <div className="flex gap-1">
-          {(['daily', 'weekly', 'monthly'] asconst).map(b=> (
-            <button key={b} onClick={() => setBoard(b)}
-              className={cn('rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize transition-all',
-                board=== b? 'bg-purple-700 text-white  shadow' :'bg-stone-100  text-stone-500')}>
+      {/* ── leaderboards ── */}
+      <SectionTitle right={
+        <div className="flex gap-1" role="group" aria-label="Leaderboard period">
+          {(['daily', 'weekly', 'monthly'] as const).map(b => (
+            <button key={b} onClick={() => setBoard(b)} aria-pressed={board === b}
+              className={cn('min-h-9 rounded-full px-2.5 py-1 text-[10px] font-extrabold capitalize transition-all',
+                board === b ? 'bg-purple-700 text-white shadow' : 'bg-stone-100 text-stone-600')}>
               {b}
             </button>
           ))}
         </div>
       }>🏆 Leaderboards</SectionTitle>
 
-      {hub.games.map(g=> {
-        const rows= hub.leaderboards[g.key]?.[board]?? [] return(
+      {hub.games.map(g => {
+        const rows = hub.leaderboards[g.key]?.[board] ?? []
+        return (
           <GameCard key={g.id} className="mb-3">
-            <p className="mb-2 text-xs font-blacktext-stone-700">{g.emoji} {g.name} — {board=== 'daily' ? 'TopScore(today)' : board=== 'weekly' ? 'MostDistance(7d)' :'ChampionFarmer(month)'}</p>
-            {rows.length=== 0? (
-              <p className="py-3 text-center text-[11px]text-stone-600">No scores yet— be the firstchampion! 🐔</p>
-            ) :(
-              <div className="space-y-1.5">
+            <p className="mb-2 text-xs font-black text-stone-700"><span aria-hidden="true">{g.emoji}</span> {g.name} — {BOARD_LABEL[board]}</p>
+            {rows.length === 0 ? (
+              <p className="py-3 text-center text-[11px] text-stone-600">No scores yet — be the first champion! 🐔</p>
+            ) : (
+              <ol className="space-y-1.5">
                 {rows.map((r, i) => (
-                  <div key={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i=== 0&& 'bg-amber-50 borderborder-amber-200', i=== 1&& 'bg-stone-50', i=== 2&& 'bg-orange-50/60')}>
-                    <span className="w-6 text-center text-xs font-black">{['🥇', '🥈', '🥉'][i]?? `${i+ 1}`}</span>
-                    <span className="text-lg">{r.avatar}</span>
+                  <li key={r.userId} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', i === 0 && 'border border-amber-200 bg-amber-50', i === 1 && 'bg-stone-50', i === 2 && 'bg-orange-50/60')}>
+                    <span className="w-6 text-center text-xs font-black">{['🥇', '🥈', '🥉'][i] ?? `${i + 1}`}</span>
+                    <span className="text-lg" aria-hidden="true">{r.avatar}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] font-blacktext-stone-700">
-                        {r.username} {r.vip&& '👑'}
+                      <p className="truncate text-[11px] font-black text-stone-700">
+                        {r.username} {r.vip && '👑'}
                       </p>
-                      <p className="truncate text-[9px]text-stone-600">{r.farmName}</p>
+                      <p className="truncate text-[9px] text-stone-600">{r.farmName}</p>
                     </div>
-                    <span className="text-xs font-black tabular-numstext-purple-700">
-                      {g.key=== 'chicken_run'
-                        ? (board=== 'weekly' ? `${r.value}m` :`${r.value}`)
-                        :(board=== 'weekly' ? `${r.value}m` :`${r.value} rd`)}
+                    <span className="text-xs font-black tabular-nums text-purple-700">
+                      {g.key === 'chicken_run'
+                        ? (board === 'weekly' ? `${r.value}m` : `${r.value}`)
+                        : (board === 'weekly' ? `${r.value}m` : `${r.value} rd`)}
                     </span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ol>
             )}
           </GameCard>
         )
       })}
 
-      {/* ── season rewards── */}
-      <Secti onTitle>🗓️ Season 1Rewards</SectionTitle>
+      {/* ── season rewards ── */}
+      <SectionTitle>🗓️ Season 1 Rewards</SectionTitle>
       <GameCard className="mb-3">
-        {hub.seasonRewards.map(r=> (
+        {hub.seasonRewards.map(r => (
           <div key={r.rank} className="flex items-center gap-3 border-b border-stone-100 py-2 last:border-0">
-            <span className="text-2xl">{r.emoji}</span>
+            <span className="text-2xl" aria-hidden="true">{r.emoji}</span>
             <div className="flex-1">
-              <p className="text-[11px] font-blacktext-stone-700">{['🥇 1st', '🥈 2nd', '🥉 3rd'][r.rank -1]} — {r.prize}</p>
-              <p className="text-[10px]text-stone-600">{r.detail}</p>
+              <p className="text-[11px] font-black text-stone-700">{['🥇 1st', '🥈 2nd', '🥉 3rd'][r.rank - 1]} — {r.prize}</p>
+              <p className="text-[10px] text-stone-600">{r.detail}</p>
             </div>
           </div>
         ))}
-        <p className="mt-2 text-[10px]text-stone-600">Monthly champions are crowned by total arcade score.Admins pay out season rewards from the controlcenter.</p>
+        <p className="mt-2 text-[10px] text-stone-600">
+          Monthly champions are crowned by total arcade score. Admins pay out season rewards from the control center.
+        </p>
       </GameCard>
 
-      {/* ── tier ladder── */}
-      <Secti onTitle>⚡ DifficultyTiers</SectionTitle>
+      {/* ── tier ladder ── */}
+      <SectionTitle>⚡ Difficulty Tiers</SectionTitle>
       <GameCard className="mb-3">
-        {hub.tierInfo.map(t=> (
-          <div key={t.key} className={cn('flex items-center gap-2 border-b border-stone-100 py-2 last:border-0', t.locked&& 'opacity-50')}>
-            <span className="text-lg">{t.current? '📍' : t.locked? '🔒' :'✅'}</span>
+        {hub.tierInfo.map(t => (
+          <div key={t.key} className={cn('flex items-center gap-2 border-b border-stone-100 py-2 last:border-0', t.locked && 'opacity-50')}>
+            <span className="text-lg" aria-hidden="true">{t.current ? '📍' : t.locked ? '🔒' : '✅'}</span>
             <div className="flex-1">
-              <p className="text-[11px] font-blacktext-stone-700">{t.name} <span className="text-purple-600">×{t.mult}</span></p>
-              <p className="text-[10px]text-stone-600">{t.desc} · requires farmer level{t.reqLevel}</p>
+              <p className="text-[11px] font-black text-stone-700">{t.name} <span className="text-purple-700">×{t.mult}</span></p>
+              <p className="text-[10px] text-stone-600">{t.desc} · requires farmer level {t.reqLevel}</p>
             </div>
           </div>
         ))}
       </GameCard>
 
-      {/* ── recent sessions── */}
-      {hub.recentSessions.length> 0&& (
+      {/* ── recent sessions ── */}
+      {hub.recentSessions.length > 0 && (
         <>
-          <Secti onTitle>🕹️ RecentPlays</SectionTitle>
+          <SectionTitle>🕹️ Recent Plays</SectionTitle>
           <GameCard>
-            {hub.recentSessions.map(s=> (
+            {hub.recentSessions.map(s => (
               <div key={s.id} className="flex items-center gap-2 border-b border-stone-100 py-1.5 text-[11px] last:border-0">
-                <span>{s.gameKey=== 'chicken_run' ? '🏃' :'🚦'}</span>
-                <span className={cn('font-black', s.result=== 'win' ? 'text-green-600' :'text-stone-500')}>
-                  {s.result=== 'win' ? 'WIN' :'LOSS'}
+                <span aria-hidden="true">{s.gameKey === 'chicken_run' ? '🏃' : '🚦'}</span>
+                <span className={cn('font-black', s.result === 'win' ? 'text-green-700' : 'text-stone-600')}>
+                  {s.result === 'win' ? 'WIN' : 'LOSS'}
                 </span>
-                <span className="flex-1 text-stone-600tabular-nums">
-                  {s.gameKey=== 'chicken_run' ? `${s.distance}m` :`${s.score} roads`} · {new Date(s.createdAt).toLocaleDateString()}
+                <span className="flex-1 tabular-nums text-stone-600">
+                  {s.gameKey === 'chicken_run' ? `${s.distance}m` : `${s.score} roads`} · {new Date(s.createdAt).toLocaleDateString()}
                 </span>
-                <span className="font-bold text-amber-600tabular-nums">🪙{s.coins}</span>
+                <span className="font-bold tabular-nums text-amber-700">🪙{s.coins}</span>
               </div>
             ))}
           </GameCard>
         </>
       )}
 
-      {/* ── reward result modal── */}
-      {result&& (
-        <motion.div initial={{ opacity: 0}} animate={{ opacity: 1}}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60p-6"
+      {/* ── reward result modal ── */}
+      {result && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
           onClick={() => setResult(null)}
         >
-          <motion.div initial={{ scale:0.7, y: 30}} animate={{ scale:1, y: 0}}
-            transition={{ type:'spring', bounce: 0.45}}
+          <motion.div initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }}
+            transition={{ type: 'spring', bounce: 0.45 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={result.rejected ? 'Result rejected' : result.result === 'win' ? 'Victory' : 'Game over'}
             className={cn(
-              'w-full max-w-xs rounded-3xl border-4 bg-gradient-to-b p-6 text-centershadow-2xl',
-              result.rejected? 'border-red-300 from-red-50to-red-100'
-                : result.result=== 'win' ? 'border-amber-300 from-yellow-50to-amber-100'
-                :'border-stone-300 from-stone-50to-stone-100'
+              'w-full max-w-xs rounded-3xl border-4 bg-gradient-to-b p-6 text-center shadow-2xl',
+              result.rejected ? 'border-red-300 from-red-50 to-red-100'
+                : result.result === 'win' ? 'border-amber-300 from-yellow-50 to-amber-100'
+                : 'border-stone-300 from-stone-50 to-stone-100',
             )}
           >
-            <motion.div animate={{ scale:[1, 1.15, 1], rotate:[0, 8, -8, 0]}}
-              transition={{ repeat:Infinity, duration: 1.8}}
+            <motion.div animate={{ scale: [1, 1.15, 1], rotate: [0, 8, -8, 0] }}
+              transition={{ repeat: Infinity, duration: 1.8 }}
               className="text-6xl"
             >
-              {result.rejected? '🚨' : result.result=== 'win' ? '🏆' :'🐔'}
+              <span aria-hidden="true">{result.rejected ? '🚨' : result.result === 'win' ? '🏆' : '🐔'}</span>
             </motion.div>
-            <p className="mt-2 text-xl font-blacktext-stone-800">
-              {result.rejected? 'ResultRejected' : result.result=== 'win' ? 'VICTORY!' :'GameOver'}
+            <p className="mt-2 text-xl font-black text-stone-800">
+              {result.rejected ? 'Result Rejected' : result.result === 'win' ? 'VICTORY!' : 'Game Over'}
             </p>
-            {result.rejected? (
-              <p className="mt-1 text-xstext-red-600">{result.reason} — rewardsvoided.</p>
-            ) :(
+            {result.rejected ? (
+              <p className="mt-1 text-xs text-red-600">{result.reason} — rewards voided.</p>
+            ) : (
               <>
                 <div className="mt-3 flex justify-center gap-3 text-lg font-black">
-                  <span className="text-amber-600">🪙 {result.coins?? 0}</span>
-                  {result.eggs? <span className="text-stone-500">🥚 {result.eggs}</span> :null}
-                  {result.gems? <span className="text-pink-500">💎 {result.gems}</span> :null}
-                  <span className="text-green-600">+{result.xp?? 0} XP</span>
+                  <span className="text-amber-700">🪙 {result.coins ?? 0}</span>
+                  {result.eggs ? <span className="text-stone-600">🥚 {result.eggs}</span> : null}
+                  {result.gems ? <span className="text-pink-600">💎 {result.gems}</span> : null}
+                  <span className="text-green-700">+{result.xp ?? 0} XP</span>
                 </div>
-                {result.mysteryItems&& result.mysteryItems.length> 0&& (
-                  <p className="mt-2 text-[11px] font-boldtext-purple-600">🎁 Mystery boxes:{result.mysteryItems.join(', ')}</p>
+                {result.mysteryItems && result.mysteryItems.length > 0 && (
+                  <p className="mt-2 text-[11px] font-bold text-purple-700">🎁 Mystery boxes: {result.mysteryItems.join(', ')}</p>
                 )}
-                {result.championBuff&& (
-                  <p className="mt-1 text-[11px] font-blacktext-orange-500">🏅 Championbuff! +10% production for12h</p>
+                {result.championBuff && (
+                  <p className="mt-1 text-[11px] font-black text-orange-600">🏅 Champion buff! +10% production for 12h</p>
                 )}
-                {result.lines&& result.lines.length> 0&& (
-                  <div className="mt-2 space-y-0.5 rounded-xl bg-white/70p-2">
-                    {result.lines.map((l, i) => <pkey={i} className="text-[10px]text-stone-500">{l}</p>)}
+                {result.lines && result.lines.length > 0 && (
+                  <div className="mt-2 space-y-0.5 rounded-xl bg-white/70 p-2">
+                    {result.lines.map((l, i) => <p key={i} className="text-[10px] text-stone-600">{l}</p>)}
                   </div>
                 )}
               </>
             )}
             <button onClick={() => setResult(null)}
-              className="mt-4 w-full rounded-2xl bg-purple-700 py-3 text-sm font-extrabold text-white shadow-lgactive:scale-95">
-              Back toArcade🎮
+              className="mt-4 w-full rounded-2xl bg-purple-700 py-3 text-sm font-extrabold text-white shadow-lg active:scale-95">
+              Back to Arcade 🎮
             </button>
           </motion.div>
         </motion.div>
