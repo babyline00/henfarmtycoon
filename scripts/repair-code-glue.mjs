@@ -131,40 +131,77 @@ function explode(tok) {
   return [...(explode(s[0]) ?? [s[0]]), ...(explode(s[1]) ?? [s[1]])]
 }
 
-// ── masking is layered so each repair sees the right text ─────
-// 1. maskStrings: string literals become opaque placeholders. Runs first
-//    so `//` inside strings (URLs, prose) can never read as a comment.
-// 2. splitFusedComments runs on that stream: comments visible, strings safe.
-// 3. maskComments: comment text becomes placeholders so code repairs
-//    (keyword splits especially) can never touch prose.
-// 4. repairCode runs. 5. unmask restores everything.
-function maskStrings(src) {
+// ── single-pass lexer ────────────────────────────────────────
+// String literals and comments must be identified in ONE pass, in
+// source order. Two independent regex passes corrupt placeholder
+// indices: maskStrings alone reads an apostrophe inside a comment
+// (`don't`) as a string delimiter, so the later unmask puts the wrong
+// text back — which silently rewrote '/api/leaderboard' to 'value'.
+//
+// Returns both projections from the same token walk:
+//   maskedBoth  — strings AND comments as placeholders (for repairCode)
+//   stringsOnly — only strings as placeholders (for comment splitting,
+//                 where comments must stay visible)
+// Shared `parts` array; both projections use the same indices.
+function lex(src) {
   const parts = []
-  const re = /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.|\$\{(?:[^{}]|\{[^{}]*\})*\})*`)/g
-  let last = 0, out = ''
-  for (const m of src.matchAll(re)) {
-    out += src.slice(last, m.index)
+  let both = ''
+  let stringsOnly = ''
+  let i = 0
+  const n = src.length
+  const push = (text, isComment) => {
     const idx = parts.length
-    parts.push(m[0])
-    out += `\u0000${idx}\u0000`
-    last = m.index + m[0].length
+    parts.push(text)
+    const ph = `\u0000${idx}\u0000`
+    both += ph
+    stringsOnly += isComment ? text : ph
   }
-  out += src.slice(last)
-  return { masked: out, parts }
-}
-function maskComments(src, parts) {
-  const re = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g
-  let last = 0, out = ''
-  for (const m of src.matchAll(re)) {
-    out += src.slice(last, m.index)
-    const idx = parts.length
-    parts.push(m[0])
-    out += `\u0000${idx}\u0000`
-    last = m.index + m[0].length
+  while (i < n) {
+    const ch = src[i]
+    const two = src.slice(i, i + 2)
+    if (two === '//') {
+      let j = i
+      while (j < n && src[j] !== '\n') j++
+      push(src.slice(i, j), true)
+      i = j
+    } else if (two === '/*') {
+      let j = src.indexOf('*/', i + 2)
+      j = j === -1 ? n : j + 2
+      push(src.slice(i, j), true)
+      i = j
+    } else if (ch === "'" || ch === '"' || ch === '`') {
+      let j = i + 1
+      while (j < n) {
+        if (src[j] === '\\') { j += 2; continue }
+        if (src[j] === ch) { j++; break }
+        if (ch !== '`' && src[j] === '\n') break // unterminated
+        j++
+      }
+      push(src.slice(i, j), false)
+      i = j
+    } else {
+      // Advance only to the next thing that can START a token. Jumping
+      // straight to the newline would swallow string literals sitting in
+      // the middle of a line, so they never got tokenized — and an
+      // unmasked literal then collides with a placeholder index.
+      let stop = -1
+      let j = i
+      while (j < n) {
+        const c = src[j]
+        if (c === '\n' || c === "'" || c === '"' || c === '`') { stop = j; break }
+        if (c === '/' && (src[j + 1] === '/' || src[j + 1] === '*')) { stop = j; break }
+        j++
+      }
+      const end = stop === -1 ? n : Math.max(stop, i + 1)
+      const chunk = src.slice(i, end)
+      both += chunk
+      stringsOnly += chunk
+      i = end
+    }
   }
-  out += src.slice(last)
-  return out
+  return { maskedBoth: both, stringsOnly, parts }
 }
+
 // ── fused-comment splitter ────────────────────────────────
 // Newlines between `//` comment lines and code were stripped in places,
 // so whole statements now hide inside trailing comments:
@@ -244,7 +281,13 @@ function repairCode(code, file) {
   // Reserved-word glue. Guarded: these words are also the first half of
   // real identifiers (typeKey, defaultValue, extendsHelper), so the
   // following token must be a space or a declaration punctuation.
-  fix(new RegExp(`${NOT_BEFORE}(import|export|default|interface|type|extends)(?=[A-Z][A-Za-z0-9_$]*(?:\\s|[=<{(:,]|\\[))`, 'g'), (...a) => `${a[1]} `, 'kw')
+  // Split ONLY where declaration punctuation proves a fusion.
+  // `defaultValue`/`typeKey` are ordinary identifiers: splitting them
+  // corrupts working code (that bug regressed sprites.tsx once already).
+  fix(new RegExp(`${NOT_BEFORE}import(?=\\{)`, 'g'), () => 'import ', 'kw')
+  fix(new RegExp(`${NOT_BEFORE}export(?=\\{)`, 'g'), () => 'export ', 'kw')
+  fix(new RegExp(`${NOT_BEFORE}interface(?=[A-Z])(?=[A-Za-z0-9_$]*\\s*[{<(])`, 'g'), () => 'interface ', 'kw')
+  fix(new RegExp(`${NOT_BEFORE}type(?=[A-Z])(?=[A-Za-z0-9_$]*\\s*[=<{])`, 'g'), () => 'type ', 'kw')
   fix(new RegExp(`${NOT_BEFORE}else(?=[A-Za-z][A-Za-z0-9_$])`, 'g'), 'else ', 'kw')
   fix(new RegExp(`${NOT_BEFORE}typeof(?=[A-Za-z][A-Za-z0-9_$]*)`, 'g'), 'typeof ', 'kw')
   fix(new RegExp(`${NOT_BEFORE}instanceof(?=[A-Za-z][A-Za-z0-9_$]*)`, 'g'), 'instanceof ', 'kw')
@@ -289,13 +332,15 @@ for (const f of files) {
   const src = readFileSync(f, 'utf8')
   // 'useclient' directive (exact string, anywhere)
   let working = src.replace(/'useclient'/g, "'use client'")
-  const sm = maskStrings(working)
-  const parts = sm.parts
-  const decommented = splitFusedComments(sm.masked, f)
-  const fullyMasked = maskComments(decommented, parts)
-  const repairedCode = repairCode(fullyMasked, f)
+  const lx = lex(working)
+  const parts = lx.parts
+  // comments visible, strings opaque → safe to find `//` and split
+  const decommented = splitFusedComments(lx.stringsOnly, f)
+  // then re-lex so comment bodies are opaque for the code repairs
+  const lx2 = lex(decommented)
+  const repairedCode = repairCode(lx2.maskedBoth, f)
   // repair strings individually so the class tokenizer sees real text
-  const repairedParts = parts.map(p => {
+  const repairedParts = lx2.parts.map(p => {
     if (/^'use client'$/.test(p)) return p
     if (/^\/\//.test(p) || /^\/\*/.test(p)) return p
     if (/^['"`]/.test(p)) return repairString(p, f)
