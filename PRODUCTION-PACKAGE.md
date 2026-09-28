@@ -44,7 +44,7 @@ bun run start          # serves on :3000
 
 ## 4. Default accounts (CHANGE IMMEDIATELY)
 
-- Super Admin: `admin / admin123` → Admin Panel → set a new password & roles
+- Super Admin: `admin` + the `ADMIN_PASSWORD` you supplied → Admin Panel → set your own password & roles
 
 ## 5. Production checklist
 

@@ -35,7 +35,8 @@ docker compose exec app npx tsx scripts/seed.ts   # or bake into image
 
 # 3. Open
 #    http://SERVER_IP/            → mobile game (PWA-style layout)
-#    Admin login → admin / admin123 (change immediately!)
+#    Admin login → admin / the ADMIN_PASSWORD you supplied.
+#    (unset? the seed generates one and prints it once — save it)
 #    Players create their own account from the login screen
 ```
 
@@ -58,7 +59,8 @@ The app is a mobile-first web app (max-w-md phone layout, PWA-ready). To ship to
 
 ## Production checklist
 
-- [ ] Change the default admin password (`admin/admin123`) immediately
+- [ ] Confirm `ADMIN_PASSWORD` was set for the seed, and that the admin
+      password has been changed from whatever the seed produced
 - [ ] Point `DATABASE_URL` at a persistent volume (compose does this) or managed Postgres
 - [ ] Enable TLS on nginx (certbot) and add HSTS
 - [ ] Set up DB backups: `sqlite3 /app/db/custom.db ".backup /backups/$(date +%F).db"` via cron

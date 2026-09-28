@@ -17,6 +17,9 @@
 //   • SHA-256 password hashing                       → no memory hardness
 // ═════════════════════════════════════════════════════════════
 
+// The dev default only. Against a real deployment this must be supplied, because
+// a public repository must never carry a working super-admin credential.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
 const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
@@ -99,7 +102,7 @@ async function main() {
 
   // ── super admin ──
   const adminLogin = await api('/api/auth', {
-    method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' },
+    method: 'POST', body: { action: 'login', username: 'admin', password: ADMIN_PASSWORD },
   })
   check('Super admin can log in (legacy SHA-256 hash verified + upgraded)', adminLogin.status === 200 && !!adminLogin.data.token,
     JSON.stringify(adminLogin.data))

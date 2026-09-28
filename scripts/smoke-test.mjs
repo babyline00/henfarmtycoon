@@ -8,6 +8,9 @@
 // clans), admin analytics/security, wallet reconciliation.
 // ═════════════════════════════════════════════════════════════
 
+// The dev default only. Against a real deployment this must be supplied, because
+// a public repository must never carry a working super-admin credential.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
 const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
@@ -186,7 +189,7 @@ async function main() {
   check('Rate limiter engages on spam', rateLimited)
 
   // ── admin (super) ──
-  const adminLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' } })
+  const adminLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: ADMIN_PASSWORD } })
   const adminToken = adminLogin.data.token
   check('Admin login', adminLogin.status === 200 && adminLogin.data.isAdmin === true)
 

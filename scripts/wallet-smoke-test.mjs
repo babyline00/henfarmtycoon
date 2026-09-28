@@ -6,6 +6,9 @@
 //         saved payment profile, wallet reconciliation.
 // Run: node scripts/wallet-smoke-test.mjs
 // ═════════════════════════════════════════════════════════════
+// The dev default only. Against a real deployment this must be supplied, because
+// a public repository must never carry a working super-admin credential.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
 const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
@@ -38,7 +41,7 @@ async function main() {
   console.log('── Wallet System Smoke Test ──')
 
   // admin login (the player side uses a dedicated fresh QA account below)
-  const adminLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' } })
+  const adminLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: ADMIN_PASSWORD } })
   ok(adminLogin.status === 200 && adminLogin.data.token, 'admin login')
   const admin = adminLogin.data.token
 

@@ -1,9 +1,28 @@
 // Seed script for Hen Farming Game
 // Run: bun run scripts/seed.ts
 import { PrismaClient } from '@prisma/client'
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 
 const db = new PrismaClient()
+
+/**
+ * The super-admin password.
+ *
+ * It used to be the literal `admin123`, hardcoded here and printed at the end
+ * of the seed. In a public repository that is not a development convenience,
+ * it is a published default: anyone who clones this and deploys it has a
+ * publicly-known super-admin login, and the deploy logs and the README tell
+ * them exactly what it is.
+ *
+ * So there is no default. Supply ADMIN_PASSWORD, or a strong one is generated
+ * and printed once — once, because printing it every seed run is how it ends
+ * up in a screenshot.
+ */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (() => {
+  const raw = randomBytes(18).toString('base64url')
+  return `Hf!${raw}`
+})()
+const ADMIN_PASSWORD_IS_GENERATED = !process.env.ADMIN_PASSWORD
 
 function hash(password: string): string {
   return createHash('sha256').update(`henfarm::${password}`).digest('hex')
@@ -40,7 +59,7 @@ async function main() {
     create: {
       username: 'admin',
       email: 'admin@henfarm.io',
-      password: hash('admin123'),
+      password: hash(ADMIN_PASSWORD),
       farmName: 'Sunrise HQ Farm',
       avatar: '🛡️',
       coins: 1_000_000,
@@ -232,7 +251,11 @@ async function main() {
   }
 
   console.log('✅ Seed complete.')
-  console.log('   Admin login → username: admin / password: admin123')
+  console.log(`   Admin login → username: admin / password: ${ADMIN_PASSWORD_IS_GENERATED ? ADMIN_PASSWORD : '(the ADMIN_PASSWORD you set)'}`)
+  if (ADMIN_PASSWORD_IS_GENERATED) {
+    console.log('   ^ generated for you because ADMIN_PASSWORD was not set. Save it now —')
+    console.log('     it is not recoverable, and re-seeding will generate a different one.')
+  }
   console.log('   Players create their own account from the login screen.')
   console.log(`   Admin id: ${admin.id}`)
 }

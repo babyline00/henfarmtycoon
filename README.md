@@ -21,7 +21,12 @@ admin portal, so change its password immediately on any real deployment:
 
 | User | Password | Role |
 |---|---|---|
-| `admin` | `admin123` | Super Admin (full admin panel) |
+| `admin` | the value of `ADMIN_PASSWORD` | Super Admin (full admin panel) |
+
+If `ADMIN_PASSWORD` is not set, the seed script generates a strong one and
+prints it once. There is deliberately no default: this repository is public,
+so a hardcoded default would be a published super-admin login for anyone who
+deploys it.
 
 ## Verifying it
 

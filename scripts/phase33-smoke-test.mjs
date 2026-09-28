@@ -1,4 +1,7 @@
 // Phase 33 / 25 / 26 / 27 — API smoke test
+// The dev default only. Against a real deployment this must be supplied, because
+// a public repository must never carry a working super-admin credential.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
 const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 let failures = 0
 
@@ -43,7 +46,7 @@ async function main() {
   check('fresh arcade player registered', reg.status === 200 && reg.data.token, JSON.stringify(reg.data).slice(0, 80))
   const token = reg.data.token
 
-  const adminLogin = await req('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' } })
+  const adminLogin = await req('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: ADMIN_PASSWORD } })
   check('admin login', adminLogin.status === 200 && adminLogin.data.token)
   const adminToken = adminLogin.data.token
 
