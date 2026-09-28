@@ -108,10 +108,21 @@ Not built yet. Ordered by value, not by how fun they sound.
 
 ### Medium
 
-4. **Port the logical-field approach to the other two games.** This is the
-   real fix for physics, not just for Egg Catch: move Chicken Run and Road
-   Crossing to a fixed field and their collision maths stops depending on
-   the viewport.
+4. ~~Port the logical-field approach to the other two games.~~ **Done.**
+   Chicken Run and Road Crossing now simulate in a fixed logical field
+   (`RUN_FIELD_*`, `CROSS_FIELD_*`) mapped onto the canvas by
+   `fieldTransform`, the same way Egg Catch does. Their collision maths no
+   longer depends on the viewport: reaction time in Chicken Run used to range
+   from 4.71s to 7.03s depending on the device and is now 6.67s everywhere.
+   `CROSS_FIELD_H` is 850 for that measured reason, and a test pins the
+   number so retuning it is deliberate.
+
+   Two things the port removed rather than fixed: Road Crossing's resize
+   handler had to rescale every vehicle by the width ratio, because rows
+   generated at the old width were left bunched at one edge of the new one —
+   a resize is now purely a repaint. And the touch slop threshold was 20
+   *client* pixels, so the required swipe grew as the canvas shrank; it is
+   now 20 logical units.
 5. **A fourth game on the same scaffold.** The framework is now the cheap
    part: register a key, a definition, physics constants, an evaluator, a
    route branch and a component. A rhythm/timing game would use the

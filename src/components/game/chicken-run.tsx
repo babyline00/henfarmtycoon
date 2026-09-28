@@ -12,6 +12,7 @@ import { play } from '@/lib/sfx'
 import {
   RUN_START_SPEED_MPS, RUN_BASE_SPEED_MPS, RUN_RAMP_METRES, RUN_JUMP_HEIGHT,
   runMaxSpeedMps, RUN_COMBO_CAP,
+  fieldTransform, RUN_FIELD_W, RUN_FIELD_H, type FieldTransform,
 } from '@/lib/mini-games'
 
 //══════════ MiniGame 1: Chicken Run (endless runner) ══════════
@@ -44,6 +45,7 @@ const LANES_X = [0.25, 0.5, 0.75]
 const LOW_OBSTACLES: { e: string; name: string }[] = [{ e: '🪨', name: 'rock' }, { e: '🚧', name: 'barrier' }, { e: '🐕', name: 'dog' }]
 const TALL_OBSTACLES: { e: string; name: string }[] = [{ e: '🚗', name: 'car' }, { e: '🌳', name: 'tree' }]
 const MAX_LIVES = 3
+/** Logical field units per metre travelled. The field is fixed, so this is too. */
 const PX_PER_M = 6
 
 const EMOJI_FOR: Record<string, string> = { coin: '🪙', egg: '🥚', gem: '💎', box: '🎁' }
@@ -104,20 +106,24 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
     const ctx: CanvasRenderingContext2D = maybeCtx
     const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
-    // Measured size is mutable and re-measured on resize. Rotating the
-    // device or opening the on-screen keyboard used to leave the backing
-    // store at the old size, stretching the render and desynchronising
-    // collision maths from what is actually on screen.
-    let W = canvas.clientWidth
-    let H = canvas.clientHeight
+    // ── the logical field ──
+    // The simulation runs entirely in RUN_FIELD_W x RUN_FIELD_H units. The
+    // canvas size only decides how those units are drawn, so lane spacing,
+    // the runway and every collision box are the same on a phone, a tablet
+    // and a desktop — which they were not before, when all of it was derived
+    // from clientWidth/clientHeight and reaction time ranged 4.7s to 7.0s
+    // depending on the device.
+    let tf: FieldTransform = fieldTransform({
+      fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H,
+      viewW: canvas.clientWidth, viewH: canvas.clientHeight,
+    })
     const resize = () => {
-      W = canvas.clientWidth
-      H = canvas.clientHeight
-      if (W === 0 || H === 0) return
-      canvas.width = Math.round(W * dpr)
-      canvas.height = Math.round(H * dpr)
-      // setTransform, not scale: scale() accumulates across calls.
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const cw = canvas.clientWidth
+      const ch = canvas.clientHeight
+      if (cw === 0 || ch === 0) return
+      canvas.width = Math.round(cw * dpr)
+      canvas.height = Math.round(ch * dpr)
+      tf = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: cw, viewH: ch })
     }
     resize()
 
@@ -224,16 +230,16 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       // spawn
       if (s.distance >= s.nextSpawnAt) spawnWave()
 
-      // move entities + collisions
-      const playerY = H - 86
-      const px = LANES_X[0] * W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * W)
+      // move entities + collisions — all in logical units
+      const playerY = RUN_FIELD_H - 86
+      const px = LANES_X[0] * RUN_FIELD_W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * RUN_FIELD_W)
       const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * RUN_JUMP_HEIGHT : 0
       const playerRect = { x: px - 19, y: playerY - 36 - jumpH, w: 38, h: 38 }
 
       for (const en of s.entities) {
         en.y += dyPx
         if (en.dead) continue
-        const ex = en.x * W
+        const ex = en.x * RUN_FIELD_W
         if (en.kind === 'obstacle') {
           if (!en.hit && rectsOverlap(playerRect, { x: ex - 22, y: en.y - 20, w: 44, h: 44 })) {
             // jumpable if airborne & low obstacle
@@ -263,7 +269,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
           }
         }
       }
-      s.entities = s.entities.filter(en => en.y < H + 60 && !en.dead)
+      s.entities = s.entities.filter(en => en.y < RUN_FIELD_H + 60 && !en.dead)
 
       // win check
       if (s.distance >= winTarget) finish('win')
@@ -281,6 +287,16 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
     }
 
     function draw() {
+      // One transform maps logical units onto the canvas. Everything below
+      // this line is written in logical units and needs no knowledge of the
+      // viewport, which is the entire point of the port.
+      ctx.setTransform(dpr * tf.scale, 0, 0, dpr * tf.scale, dpr * tf.offX, dpr * tf.offY)
+
+      // The letterbox bars behind the field, so they do not show as gaps.
+      ctx.fillStyle = '#1c1917'
+      ctx.fillRect(-tf.offX / tf.scale, -tf.offY / tf.scale,
+        tf.viewW / tf.scale, tf.viewH / tf.scale)
+
       // sky/ground per tier
       const palettes = [
         ['#fefce8', '#d9f99d', '#a3e635'], // farm
@@ -290,11 +306,11 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
         ['#1c1917', '#44403c', '#fbbf24'], // legendary (night)
       ]
       const p = palettes[Math.min(tier, palettes.length - 1)]
-      const grad = ctx.createLinearGradient(0, 0, 0, H)
+      const grad = ctx.createLinearGradient(0, 0, 0, RUN_FIELD_H)
       grad.addColorStop(0, p[0])
       grad.addColorStop(1, p[1])
       ctx.fillStyle = grad
-      ctx.fillRect(0, 0, W, H)
+      ctx.fillRect(0, 0, RUN_FIELD_W, RUN_FIELD_H)
 
       const shakeX = s.shake > 0 ? Math.sin(s.shake * 60) * 4 : 0
       ctx.save()
@@ -303,7 +319,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       // scrolling road stripes
       const scroll = (s.distance * PX_PER_M) % 80
       ctx.fillStyle = p[2] + '55'
-      for (let y = -80 + scroll; y < H; y += 80) ctx.fillRect(0, y, W, 30)
+      for (let y = -80 + scroll; y < RUN_FIELD_H; y += 80) ctx.fillRect(0, y, RUN_FIELD_W, 30)
 
       // lane separators
       ctx.strokeStyle = '#ffffff88'
@@ -311,8 +327,8 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       ctx.lineWidth = 2
       for (const fx of [1 / 3, 2 / 3]) {
         ctx.beginPath()
-        ctx.moveTo(W * fx, 0)
-        ctx.lineTo(W * fx, H)
+        ctx.moveTo(RUN_FIELD_W * fx, 0)
+        ctx.lineTo(RUN_FIELD_W * fx, RUN_FIELD_H)
         ctx.stroke()
       }
       ctx.setLineDash([])
@@ -321,7 +337,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       for (const en of s.entities) {
-        const ex = en.x * W
+        const ex = en.x * RUN_FIELD_W
         if (en.kind === 'obstacle') {
           ctx.font = '34px serif'
           ctx.fillText(en.obstacle!, ex, en.y)
@@ -333,8 +349,8 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       }
 
       // player chicken
-      const px2 = LANES_X[0] * W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * W)
-      const playerY = H - 86
+      const px2 = LANES_X[0] * RUN_FIELD_W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * RUN_FIELD_W)
+      const playerY = RUN_FIELD_H - 86
       const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * RUN_JUMP_HEIGHT : 0
       const blink = s.invuln > 0 && Math.floor(s.time * 10) % 2 === 0
 
@@ -351,14 +367,14 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       // progress toward the win target (top of the canvas)
       const prog = Math.min(1, s.distance / winTarget)
       ctx.fillStyle = '#00000018'
-      ctx.fillRect(0, 0, W, 5)
+      ctx.fillRect(0, 0, RUN_FIELD_W, 5)
       ctx.fillStyle = '#16a34a'
-      ctx.fillRect(0, 0, W * prog, 5)
+      ctx.fillRect(0, 0, RUN_FIELD_W * prog, 5)
 
       // finish line marker
       if (prog > 0.85) {
         ctx.fillStyle = '#ffffffcc'
-        for (let i = 0; i < 10; i++) ctx.fillRect(W - 8, i * (H / 10), 8, H / 20)
+        for (let i = 0; i < 10; i++) ctx.fillRect(RUN_FIELD_W - 8, i * (RUN_FIELD_H / 10), 8, RUN_FIELD_H / 20)
       }
 
       ctx.restore()

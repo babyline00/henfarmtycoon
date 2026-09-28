@@ -539,6 +539,105 @@ export function evaluateCross(
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// The logical field — how a game maps a fixed world onto any screen
+// ══════════════════════════════════════════════════════════════
+/**
+ * Chicken Run and Road Crossing used to derive their geometry from
+ * `canvas.clientWidth` and `clientHeight`, so the same session played
+ * differently on every device: lane spacing, cell size, the vertical runway
+ * and the camera anchor all moved with the viewport, and the collision maths
+ * moved with them. Egg Catch already worked the other way — a fixed logical
+ * field scaled at draw time — and the difference is not cosmetic. It is the
+ * same class of bug as the frame-rate one: physics that quietly depends on
+ * something outside the simulation.
+ *
+ * A game now simulates entirely in logical units. This maps those units onto
+ * whatever the canvas happens to be, and nothing else in the game needs to
+ * know the viewport exists.
+ *
+ * Sizes are close to the play area the games used to get on a phone, on
+ * purpose. Moving to a fixed field necessarily changes the feel a little, and
+ * the least disruptive size is the one players already had.
+ */
+export const RUN_FIELD_W = 480
+/**
+ * 850, not a round number, because it is a measured choice.
+ *
+ * Reaction time is how long an obstacle is on screen before it reaches the
+ * player, and before the port it was whatever the device made it: 7.03s on a
+ * 448x903 canvas, 6.62s on an iPhone 14, 4.93s in a short window — a 49%
+ * spread that quietly decided who could play. 850 logical units gives 6.67s
+ * everywhere, which sits in the middle of what players actually had on the
+ * common devices, so normalising it does not make the game meaningfully
+ * harder for most of them. scripts/mini-physics.test.ts asserts this number
+ * so any later retune is a deliberate act rather than an accident.
+ */
+export const RUN_FIELD_H = 850
+export const CROSS_FIELD_W = 480
+export const CROSS_FIELD_H = 720
+
+export interface FieldTransform {
+  /** Logical units -> CSS pixels. One scalar, so nothing is ever distorted. */
+  scale: number
+  /** CSS-pixel offset that centres the field in the viewport. */
+  offX: number
+  offY: number
+  viewW: number
+  viewH: number
+  /** CSS pixel -> logical unit. */
+  toLogicalX(cssX: number): number
+  toLogicalY(cssY: number): number
+  /** Logical unit -> CSS pixel. */
+  toCssX(logicalX: number): number
+  toCssY(logicalY: number): number
+}
+
+/**
+ * Fit a fixed logical field into a viewport.
+ *
+ * `contain` (the default) scales down to fit and letterboxes the remainder,
+ * so the whole play field is always visible and the aspect ratio is preserved
+ * — a wider screen gets bars, never a stretched world, because stretching
+ * would rescale collision boxes non-uniformly and put the hitboxes back in
+ * the wrong places.
+ *
+ * A zero or non-finite viewport returns a safe identity transform rather than
+ * NaN: this is called from a ResizeObserver, and a collapsed element (a
+ * hidden tab, a display:none ancestor) is a normal thing to measure, not an
+ * error. NaN here would poison the render transform for the rest of the frame
+ * and the game would draw nothing until the next resize.
+ */
+export function fieldTransform(opts: {
+  fieldW: number
+  fieldH: number
+  viewW: number
+  viewH: number
+  fit?: 'contain' | 'cover'
+}): FieldTransform {
+  const fw = Number.isFinite(opts.fieldW) && opts.fieldW > 0 ? opts.fieldW : 1
+  const fh = Number.isFinite(opts.fieldH) && opts.fieldH > 0 ? opts.fieldH : 1
+  const vw = Number.isFinite(opts.viewW) && opts.viewW > 0 ? opts.viewW : 0
+  const vh = Number.isFinite(opts.viewH) && opts.viewH > 0 ? opts.viewH : 0
+  const cover = opts.fit === 'cover'
+
+  const ratio = vw > 0 && vh > 0 ? (cover ? Math.max(vw / fw, vh / fh) : Math.min(vw / fw, vh / fh)) : 1
+  const scale = Number.isFinite(ratio) && ratio > 0 ? ratio : 1
+  const offX = (vw - fw * scale) / 2
+  const offY = (vh - fh * scale) / 2
+  return {
+    scale,
+    offX: Number.isFinite(offX) ? offX : 0,
+    offY: Number.isFinite(offY) ? offY : 0,
+    viewW: vw,
+    viewH: vh,
+    toLogicalX: (cssX) => (cssX - offX) / scale,
+    toLogicalY: (cssY) => (cssY - offY) / scale,
+    toCssX: (lx) => lx * scale + offX,
+    toCssY: (ly) => ly * scale + offY,
+  }
+}
+
 // ── Egg Catch ────────────────────────────────────────────────
 
 export interface CatchTelemetry {

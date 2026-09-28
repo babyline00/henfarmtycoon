@@ -12,6 +12,7 @@ import {
   CROSS_MIN_SEC_PER_ROW, CROSS_MIN_SEC_PER_ROW_FAST,
   CROSS_HOP_INPUT_COOLDOWN, CROSS_HOP_INPUT_COOLDOWN_FAST,
   crossWinTarget,
+  fieldTransform, CROSS_FIELD_W, CROSS_FIELD_H, type FieldTransform,
 } from '@/lib/mini-games'
 
 //══════════ MiniGame 2: Chicken Road Crossing (frogger) ══════════
@@ -45,6 +46,8 @@ interface Row {
 }
 
 const COLS = 5
+/** Swipe threshold in logical field units, so it is the same gesture on any screen. */
+const TOUCH_SLOP = 20
 const VEHICLES = ['🚗', '🚚', '🏍️', '🚜']
 const POWERS: { key: string; emoji: string }[] = [
   { key: 'shield', emoji: '🛡️' },
@@ -101,34 +104,33 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     const ctx: CanvasRenderingContext2D = maybeCtx
     const dpr = Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
-    // Re-measured on resize. CELL drives every collision test, so a stale
-    // value after rotation made the player collide in the wrong places.
-    let W = canvas.clientWidth
-    let H = canvas.clientHeight
-    let CELL = W / COLS
+    // ── the logical field ──
+    // Everything below simulates in CROSS_FIELD_W x CROSS_FIELD_H units and
+    // the canvas size only decides how that is drawn. CELL used to be
+    // `clientWidth / COLS`, so the cell — which drives every collision test —
+    // was a different size on every device, and the camera anchor moved with
+    // the window height.
+    //
+    // The old resize handler also had to rescale every vehicle by the width
+    // ratio, because rows generated at the old width were left bunched at one
+    // edge of the new one. That whole workaround disappears when the road
+    // does not change size: a resize is now purely a repaint.
+    const FW = CROSS_FIELD_W
+    const FH = CROSS_FIELD_H
+    const CELL = FW / COLS
+    const CAM_Y = FH * 0.72
 
+    let tf: FieldTransform = fieldTransform({
+      fieldW: FW, fieldH: FH,
+      viewW: canvas.clientWidth, viewH: canvas.clientHeight,
+    })
     const resize = () => {
-      const prevW = W
-      W = canvas.clientWidth
-      H = canvas.clientHeight
-      if (W === 0 || H === 0) return
-      CELL = W / COLS
-      canvas.width = Math.round(W * dpr)
-      canvas.height = Math.round(H * dpr)
-      // setTransform, not scale: scale() accumulates across calls.
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      // Rows are generated once, against whatever W happened to be at the
-      // time. Rotating the device changed W, which left every vehicle
-      // clustered into one edge of the new, wider road — the traffic
-      // bunched up and the crossing became trivially easy. Rescale by the
-      // ratio so the road keeps its shape. stateRef is read directly
-      // because `s` is not initialised until after the first resize call.
-      if (prevW > 0 && W > 0 && prevW !== W) {
-        const ratio = W / prevW
-        for (const r of stateRef.current.rows) {
-          for (const v of r.vehicles) v.x *= ratio
-        }
-      }
+      const cw = canvas.clientWidth
+      const ch = canvas.clientHeight
+      if (cw === 0 || ch === 0) return
+      canvas.width = Math.round(cw * dpr)
+      canvas.height = Math.round(ch * dpr)
+      tf = fieldTransform({ fieldW: FW, fieldH: FH, viewW: cw, viewH: ch })
     }
     resize()
 
@@ -163,7 +165,7 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
           for (let v = 0; v < nVeh; v++) {
             const vi = Math.floor(Math.random() * VEHICLES.length)
             vehicles.push({
-              x: (W / (nVeh + 1)) * (v + 1) + Math.random() * 60,
+              x: (FW / (nVeh + 1)) * (v + 1) + Math.random() * 60,
               speed: baseSpeed * (0.85 + Math.random() * 0.3),
               emoji: VEHICLES[vi],
               w: VEHICLES[vi] === '🚚' ? CELL * 1.1 : CELL * 0.85,
@@ -223,9 +225,13 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     const onTouchEnd = (e: TouchEvent) => {
       if (!touchStart) return
       const t = e.changedTouches[0]
-      const dx = t.clientX - touchStart.x
-      const dy = t.clientY - touchStart.y
-      if (Math.abs(dx) < 20 && Math.abs(dy) < 20) hop(0, 1)
+      // Deltas are client pixels; the slop threshold is in logical units, so
+      // a swipe means the same gesture on every screen. Comparing a fixed
+      // 20 client pixels meant the required swipe grew as the canvas got
+      // smaller.
+      const dx = (t.clientX - touchStart.x) / tf.scale
+      const dy = (t.clientY - touchStart.y) / tf.scale
+      if (Math.abs(dx) < TOUCH_SLOP && Math.abs(dy) < TOUCH_SLOP) hop(0, 1)
       else if (Math.abs(dx) > Math.abs(dy)) hop(dx > 0 ? 1 : -1, 0)
       else hop(0, dy < 0 ? 1 : -1)
       touchStart = null
@@ -286,8 +292,8 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
         if (r.type !== 'road' || frozen) continue
         for (const v of r.vehicles) {
           v.x += v.speed * r.dir * dt
-          if (r.dir === 1 && v.x > W + 50) v.x = -50
-          if (r.dir === -1 && v.x < -50) v.x = W + 50
+          if (r.dir === 1 && v.x > FW + 50) v.x = -50
+          if (r.dir === -1 && v.x < -50) v.x = FW + 50
         }
       }
 
@@ -358,18 +364,24 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     }
 
     function draw() {
-      const camY = H * 0.72 // chicken anchored near bottom
+      const camY = CAM_Y // chicken anchored near bottom
       const night = tier >= 2
+
+      // Map logical units onto the canvas once; everything below is logical.
+      ctx.setTransform(dpr * tf.scale, 0, 0, dpr * tf.scale, dpr * tf.offX, dpr * tf.offY)
+      // fill the letterbox bars too, so they do not read as gaps
+      ctx.fillStyle = '#1c1917'
+      ctx.fillRect(-tf.offX / tf.scale, -tf.offY / tf.scale, tf.viewW / tf.scale, tf.viewH / tf.scale)
 
       // base background
       ctx.fillStyle = night ? '#0f172a' : '#7dd87d'
-      ctx.fillRect(0, 0, W, H)
+      ctx.fillRect(0, 0, FW, FH)
 
       const rowIndexToY = (i: number) => camY - (i - s.renderRow) * CELL
 
       // visible rows
       const firstRow = Math.max(0, Math.floor(s.renderRow) - Math.ceil(camY / CELL) - 1)
-      const lastRow = Math.min(s.rows.length - 1, Math.ceil(s.renderRow + (H - camY) / CELL) + 2)
+      const lastRow = Math.min(s.rows.length - 1, Math.ceil(s.renderRow + (FH - camY) / CELL) + 2)
       for (let i = firstRow; i <= lastRow; i++) {
         const r = s.rows[i]
         if (!r) continue
@@ -378,20 +390,20 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
         // row background
         if (r.type === 'road') {
           ctx.fillStyle = night ? '#1e293b' : '#57534e'
-          ctx.fillRect(0, y - CELL / 2, W, CELL)
+          ctx.fillRect(0, y - CELL / 2, FW, CELL)
           // center dashes
           ctx.fillStyle = night ? '#475569' : '#d6d3d1'
-          for (let x = 8; x < W; x += 44) ctx.fillRect(x, y - 2, 22, 4)
+          for (let x = 8; x < FW; x += 44) ctx.fillRect(x, y - 2, 22, 4)
         } else if (r.type === 'goal') {
           ctx.fillStyle = '#86efac'
-          ctx.fillRect(0, y - CELL / 2, W, CELL)
+          ctx.fillRect(0, y - CELL / 2, FW, CELL)
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.font = `${CELL * 0.5}px serif`
-          ctx.fillText('🏡🌻🏡🌻🏡', W / 2, y)
+          ctx.fillText('🏡🌻🏡🌻🏡', FW / 2, y)
         } else {
           ctx.fillStyle = night ? '#14532d' : '#4ade80'
-          ctx.fillRect(0, y - CELL / 2, W, CELL)
+          ctx.fillRect(0, y - CELL / 2, FW, CELL)
         }
 
         // coin
@@ -449,12 +461,12 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
       // night overlay
       if (night) {
         ctx.fillStyle = '#0f172a55'
-        ctx.fillRect(0, 0, W, H)
+        ctx.fillRect(0, 0, FW, FH)
       }
       // freeze sparkle
       if (s.freeze > 0) {
         ctx.fillStyle = '#67e8f933'
-        ctx.fillRect(0, 0, W, H)
+        ctx.fillRect(0, 0, FW, FH)
       }
     }
 

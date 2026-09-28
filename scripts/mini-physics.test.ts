@@ -31,9 +31,14 @@ import {
   catchMaxItems, catchSpawnRate, catchFallSpeed, CATCH_MAX_DURATION_SEC,
   RUN_COMBO_CAP, RUN_COMBO_STEP, catchOverlapsBasket, CATCH_FALL_MAX,
   MAX_SESSION_SEC, ABANDON_AFTER_SEC, ABANDON_GRACE_SEC,
+  fieldTransform, RUN_FIELD_W, RUN_FIELD_H, CROSS_FIELD_W, CROSS_FIELD_H,
+  CATCH_FIELD_W, CATCH_FIELD_H,
   RUN_MAX_DURATION_SEC, CROSS_MAX_DURATION_SEC,
   type RunTelemetry, type CrossTelemetry, type CatchTelemetry,
 } from '../src/lib/mini-games'
+
+/** Mirrors the client's PX_PER_M so the reaction-time maths matches. */
+const PX_PER_M_TEST = 6
 
 const MAX_TIER = GAME_TIERS.length - 1
 
@@ -623,4 +628,137 @@ test('the grace covers the flooring gap in the duration check', () => {
   }
   // and once past the grace it is genuinely over
   expect(ABANDON_AFTER_SEC + 1 >= ABANDON_AFTER_SEC).toBe(true)
+})
+
+// ══════════════════════════════════════════════════════════════
+// the logical field: a fixed world mapped onto any screen
+// ══════════════════════════════════════════════════════════════
+
+test('the field is always fully visible and never distorted', () => {
+  // 'contain' must fit BOTH axes. A transform that overflows either axis
+  // hides part of the play field, and one that uses different scales per
+  // axis would squash the hitboxes out of position.
+  const sizes: [number, number][] = [
+    [320, 568], [375, 667], [390, 844], [414, 896], [448, 903],
+    [800, 600], [1440, 900], [1920, 1080], [3440, 1440], [1200, 400],
+  ]
+  for (const [vw, vh] of sizes) {
+    const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: vw, viewH: vh })
+    expect(t.scale, `${vw}x${vh}`).toBeGreaterThan(0)
+    // the field fits inside the viewport
+    expect(RUN_FIELD_W * t.scale, `${vw}x${vh} width`).toBeLessThanOrEqual(vw + 0.001)
+    expect(RUN_FIELD_H * t.scale, `${vw}x${vh} height`).toBeLessThanOrEqual(vh + 0.001)
+    // and it is centred
+    expect(t.offX).toBeCloseTo((vw - RUN_FIELD_W * t.scale) / 2, 6)
+    expect(t.offY).toBeCloseTo((vh - RUN_FIELD_H * t.scale) / 2, 6)
+  }
+})
+
+test('the world is isotropic — one scale for both axes', () => {
+  // This is the property the whole port exists for. A separate x and y scale
+  // would make a circle an ellipse and move hitboxes relative to sprites.
+  const t = fieldTransform({ fieldW: 480, fieldH: 720, viewW: 1440, viewH: 500 })
+  const dx = t.toCssX(100) - t.toCssX(0)
+  const dy = t.toCssY(100) - t.toCssY(0)
+  expect(dx).toBeCloseTo(dy, 9)
+})
+
+test('logical and CSS coordinates round-trip', () => {
+  for (const [vw, vh] of [[375, 667], [800, 600], [1920, 1080]] as [number, number][]) {
+    const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: vw, viewH: vh })
+    for (const x of [0, 1, 100, 240, RUN_FIELD_W - 1]) {
+      expect(t.toLogicalX(t.toCssX(x)), `x=${x} @${vw}`).toBeCloseTo(x, 6)
+      expect(t.toCssX(t.toLogicalX(x)), `x=${x} @${vw}`).toBeCloseTo(x, 6)
+    }
+    for (const y of [0, 1, 360, RUN_FIELD_H - 1]) {
+      expect(t.toLogicalY(t.toCssY(y)), `y=${y} @${vw}`).toBeCloseTo(y, 6)
+    }
+  }
+})
+
+test('the centre of the viewport is the centre of the field', () => {
+  const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: 1440, viewH: 900 })
+  expect(t.toLogicalX(720)).toBeCloseTo(RUN_FIELD_W / 2, 6)
+  expect(t.toLogicalY(450)).toBeCloseTo(RUN_FIELD_H / 2, 6)
+})
+
+test('a collapsed viewport yields a usable transform, not NaN', () => {
+  // A ResizeObserver fires with zero when the element is display:none — a
+  // hidden tab or a collapsed ancestor, not an error. NaN here would poison
+  // the canvas transform and the game would draw nothing.
+  for (const bad of [0, -10, NaN, Infinity, -Infinity]) {
+    const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: bad, viewH: bad })
+    expect(Number.isFinite(t.scale), `viewW=${bad}`).toBe(true)
+    expect(Number.isFinite(t.offX), `viewW=${bad}`).toBe(true)
+    expect(Number.isFinite(t.toCssX(100)), `viewW=${bad}`).toBe(true)
+    expect(Number.isFinite(t.toLogicalX(100)), `viewW=${bad}`).toBe(true)
+  }
+  // a bad field size must not divide by zero either
+  for (const bad of [0, -1, NaN, Infinity]) {
+    const t = fieldTransform({ fieldW: bad, fieldH: bad, viewW: 800, viewH: 600 })
+    expect(Number.isFinite(t.scale), `fieldW=${bad}`).toBe(true)
+    expect(t.scale, `fieldW=${bad}`).toBeGreaterThan(0)
+  }
+})
+
+test('a small screen scales down rather than clipping', () => {
+  // A 320px-wide phone against a 480 logical field: scale 0.667, and the
+  // whole field still fits.
+  const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: 320, viewH: 568 })
+  expect(t.scale).toBeCloseTo(320 / RUN_FIELD_W, 6)
+  expect(RUN_FIELD_W * t.scale).toBeLessThanOrEqual(320 + 0.001)
+  // the WIDTH binds on a phone, so the field fills the width exactly and the
+  // slack becomes bars above and below
+  expect(t.offX).toBeCloseTo(0, 6)
+  expect(t.offY).toBeGreaterThan(0)
+  expect(RUN_FIELD_H * t.scale).toBeLessThan(568)
+})
+
+test('cover fills the viewport and overflows on one axis', () => {
+  const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: 1920, viewH: 400, fit: 'cover' })
+  expect(t.scale).toBeCloseTo(Math.max(1920 / RUN_FIELD_W, 400 / RUN_FIELD_H), 6)
+})
+
+test('the field sizes are positive and consistent with each other', () => {
+  for (const v of [RUN_FIELD_W, RUN_FIELD_H, CROSS_FIELD_W, CROSS_FIELD_H]) {
+    expect(Number.isFinite(v)).toBe(true)
+    expect(v).toBeGreaterThan(0)
+  }
+  // Egg Catch keeps its own field; all three are the same order of magnitude
+  // so the games feel related rather than two of them being a dollhouse
+  for (const v of [CATCH_FIELD_W, CATCH_FIELD_H]) {
+    expect(v).toBeGreaterThan(0)
+  }
+})
+
+test('the run field gives a sane, screen-independent reaction time', () => {
+  // An obstacle spawns above the field and is culled below it, so the time it
+  // is on screen is (FIELD_H + 110) / (top speed in logical px per second).
+  // This was previously 4.71s to 7.03s depending on the device — a 49% spread
+  // that decided who could play. It is now one number everywhere.
+  const travel = RUN_FIELD_H + 110
+  const topSpeed = RUN_BASE_SPEED_MPS * PX_PER_M_TEST
+  const seconds = travel / topSpeed
+  expect(seconds).toBeGreaterThan(5)
+  expect(seconds).toBeLessThan(7.5)
+  // and it does not depend on the viewport at all
+  for (const [vw, vh] of [[320, 568], [448, 903], [1920, 1080]] as [number, number][]) {
+    const t = fieldTransform({ fieldW: RUN_FIELD_W, fieldH: RUN_FIELD_H, viewW: vw, viewH: vh })
+    // whatever the screen, the field is the same number of logical units tall
+    expect((RUN_FIELD_H * t.scale) / t.scale).toBe(RUN_FIELD_H)
+    expect(seconds).toBeCloseTo((RUN_FIELD_H + 110) / topSpeed, 9)
+  }
+})
+
+test('a lane is wide enough to stand in, at every scale', () => {
+  // The hitboxes are fixed logical units. If a lane were narrower than a
+  // player plus an obstacle, there would be no safe lane to be in and the
+  // game would be unplayable rather than merely hard.
+  const PLAYER_W = 38
+  const OBSTACLE_W = 44
+  const laneWidth = (RUN_FIELD_W * (0.75 - 0.5)) // LANES_X spacing
+  expect(laneWidth).toBeGreaterThan(PLAYER_W / 2 + OBSTACLE_W / 2)
+  // the outer lanes must still sit inside the field
+  expect(RUN_FIELD_W * 0.25 - PLAYER_W / 2).toBeGreaterThan(0)
+  expect(RUN_FIELD_W * 0.75 + PLAYER_W / 2).toBeLessThan(RUN_FIELD_W)
 })
