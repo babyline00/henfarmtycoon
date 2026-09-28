@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════
+# HenFarmTycoon — Production package builder
+# Stages the full project (all app files & folders) and zips it
+# to download/HenFarmTycoon-Production.zip
+# ═══════════════════════════════════════════════════════════════
+set -euo pipefail
+
+SRC="/home/z/my-project"
+STAGE="/home/z/my-project/.staging/henfarmtycoon"
+OUT="/home/z/my-project/download/HenFarmTycoon-Production.zip"
+
+# ── 1. Clean previous staging ──────────────────────────────────
+rm -rf /home/z/my-project/.staging
+mkdir -p "$STAGE"
+
+# ── 2. Copy the whole project, minus regeneratable/internal dirs
+rsync -a \
+  --exclude 'node_modules' \
+  --exclude '.next' \
+  --exclude '.git' \
+  --exclude 'skills' \
+  --exclude 'tool-results' \
+  --exclude 'upload' \
+  --exclude '.staging' \
+  --exclude '.zscripts' \
+  --exclude '.cache' \
+  --exclude 'dev.log' \
+  --exclude 'server.log' \
+  --exclude 'dev.pid' \
+  --exclude '*.zip' \
+  --exclude 'download' \
+  "$SRC/" "$STAGE/"
+
+# QA evidence screenshots + download README ship inside the package
+mkdir -p "$STAGE/download"
+cp -r "$SRC/download/e2e" "$STAGE/download/e2e"
+cp "$SRC/download/README.md" "$STAGE/download/README.md" 2>/dev/null || true
+
+# preserve empty dirs that were part of the project
+mkdir -p "$STAGE/mini-services"
+
+# ── 3. Portable .env (SQLite path relative to prisma/schema.prisma)
+cat > "$STAGE/.env" <<'EOF'
+# HenFarmTycoon — default environment (portable)
+# SQLite path is resolved relative to prisma/schema.prisma,
+# so this works no matter where you extract the package.
+DATABASE_URL=file:../db/custom.db
+
+# For Docker (paths inside the container), docker-compose.yml already sets:
+#   DATABASE_URL=file:/app/db/custom.db
+EOF
+
+cat > "$STAGE/.env.example" <<'EOF'
+# ── SQLite (single node, zero setup — default) ─────────────────
+DATABASE_URL=file:../db/custom.db
+
+# ── Docker (already handled by docker-compose.yml) ─────────────
+# DATABASE_URL=file:/app/db/custom.db
+
+# ── PostgreSQL (horizontal scale) ──────────────────────────────
+# 1) change provider = "postgresql" in prisma/schema.prisma
+# 2) DATABASE_URL=postgresql://USER:PASS@HOST:5432/henfarm?schema=public
+# 3) npx prisma db push && npx tsx scripts/seed.ts
+EOF
+
+# ── 4. Package manifest / quickstart ───────────────────────────
+cat > "$STAGE/PRODUCTION-PACKAGE.md" <<'EOF'
+# 🐔 HenFarmTycoon — Production Package
+
+Complete, deployable source of the **farm + arcade + wallet** platform:
+mobile-first player game, Super Admin panel, full wallet system
+(manual-payment deposits with proof upload, withdrawals with account
+title / account number / bank name), 2 arcade mini-games, social
+(friends/clans), support center, AI assistant, anti-cheat, analytics
+and deployment artifacts.
+
+## 1. What's inside
+
+| Path | Contents |
+|---|---|
+| `src/app/api/**` | 20+ API routes: auth, game engine, wallet, market, social, mini-games, support, AI advisor, notifications, leaderboard, 12 admin routes |
+| `src/app/page.tsx` + `src/components/game/**` | Mobile-first UI (17 views): farm, shop, market, quests, social, games (Chicken Run / Road Crossing), wallet, profile, support, AI assistant, full admin panel |
+| `src/lib/**` | Game economy, security (rate-limit/anti-cheat/roles), auth, mini-games engine, AI advisor, payment config |
+| `prisma/schema.prisma` | 30+ models (users, farm, hens, genetics, wallet, deposits, withdrawals, transactions, mini-games, support tickets, clans, security events…) |
+| `db/custom.db` | Pre-seeded SQLite database (works out of the box) |
+| `scripts/` | `seed.ts`, smoke tests (47 + 43 checks), browser-verification screenshots, reset utilities |
+| `deploy/` + `Dockerfile` + `docker-compose.yml` | 3-stage standalone Docker build, app+redis+nginx stack, reverse-proxy config |
+| `tests/` | Runtime container verification scripts |
+| `download/e2e/` | End-to-end QA screenshots of every major flow |
+| `README-DEPLOY.md` | Full deployment guide (architecture, TLS, Capacitor mobile packaging) |
+
+## 2. Quick start — Docker (recommended)
+
+```bash
+unzip HenFarmTycoon-Production.zip && cd henfarmtycoon
+docker compose up -d --build
+# seed demo data (skip if you keep the shipped db/custom.db)
+docker compose exec app npx tsx scripts/seed.ts
+# open http://SERVER_IP/
+```
+
+## 3. Quick start — Bare metal (Node 20+ or Bun)
+
+```bash
+unzip HenFarmTycoon-Production.zip && cd henfarmtycoon
+bun install            # or: npm install
+npx prisma generate
+bun run build          # next standalone build
+bun run start          # serves on :3000
+```
+
+## 4. Default accounts (CHANGE IMMEDIATELY)
+
+- Super Admin: `admin / admin123` → Admin Panel → set a new password & roles
+- Demo player: `demo / demo123`
+
+## 5. Production checklist
+
+- [ ] Change admin password + rotate any demo accounts
+- [ ] Serve behind TLS (nginx conf in `deploy/` — add certbot/Let's Encrypt)
+- [ ] Swap the **mock payment gateway** in `src/lib/payment.ts` /
+      `purchase_gems` / `purchase_vip` actions for Stripe/Paddle before
+      charging real money
+- [ ] Review wallet limits & fees in Admin → Wallet Management
+- [ ] For multi-instance scale: switch `DATABASE_URL` to PostgreSQL
+      (see `.env.example`) and enable the Redis rate-limit store
+- [ ] Enable automated DB backups (`db/` volume + `sqlite3 .backup` cron)
+EOF
+
+# ── 5. Zip it ───────────────────────────────────────────────────
+mkdir -p /home/z/my-project/download
+rm -f "$OUT"
+cd /home/z/my-project/.staging
+zip -qr9 "$OUT" henfarmtycoon
+
+# ── 6. Verify ───────────────────────────────────────────────────
+echo "── integrity ──"
+unzip -t "$OUT" > /dev/null && echo "ZIP OK"
+echo "── stats ──"
+FILES=$(unzip -l "$OUT" | tail -1 | awk '{print $2}')
+SIZE=$(du -h "$OUT" | cut -f1)
+echo "files: $FILES   size: $SIZE"
+echo "── top-level contents ──"
+unzip -l "$OUT" | awk '{print $4}' | grep -E '^henfarmtycoon/[^/]*$' | sort | head -40

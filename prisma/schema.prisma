@@ -1,0 +1,484 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  email          String?
+  password       String
+  avatar         String    @default("🧑‍🌾")
+  farmName       String
+  coins          Int       @default(1000)
+  gems           Int       @default(5)
+  xp             Int       @default(0)
+  isAdmin        Boolean   @default(false)
+  isBlocked      Boolean   @default(false)
+  referralCode   String    @unique
+  referredBy     String?
+  loginStreak    Int       @default(0)
+  lastDailyClaim DateTime?
+  lastSeenAt     DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  // Phase 9/15/16 — progression, monetization, security
+  vipUntil           DateTime?
+  vipPlan            String?
+  vipLastClaim       DateTime?
+  levelRewardClaimed Int       @default(0) // highest numeric level whose reward was claimed
+  flagged            Boolean   @default(false)
+  flagReason         String?
+  adminRole          String? // super | finance | game | support
+
+  // Phase 33 — mini game energy
+  gameEnergy      Int       @default(100)
+  energyUpdatedAt DateTime  @default(now())
+
+  // Phase 34 — wallet system: saved payment profile (quick withdrawal autofill)
+  savedTitle      String?
+  savedAccount    String?
+  savedBank       String?
+
+  farm          Farm?
+  hens          Hen[]
+  animals       Animal[]
+  eggs          Egg[]
+  transactions  Transaction[]
+  withdrawals   Withdrawal[]
+  missions      UserMission[]
+  notifications Notification[]
+  sessions      Session[]
+  items         InventoryItem[]
+  friendsInit   Friend[]       @relation("friendInitiator")
+  friendsRecv   Friend[]       @relation("friendReceiver")
+  clanMember    ClanMember?
+  purchases     Purchase[]
+  gameSessions  GameSession[]
+  gameStats     PlayerGameStats?
+  tickets       Ticket[]
+  deposits      Deposit[]
+}
+
+// ══════════ Phase 33 — Mini Games ══════════
+
+model MiniGame {
+  id           String   @id @default(cuid())
+  key          String   @unique // chicken_run | road_crossing
+  name         String
+  emoji        String
+  description  String
+  enabled      Boolean  @default(true)
+  energyCost   Int      @default(10)
+  rewardConfig String   @default("{}") // JSON per-game tuning
+  createdAt    DateTime @default(now())
+
+  sessions GameSession[]
+}
+
+model GameSession {
+  id        String   @id @default(cuid())
+  userId    String
+  gameId    String
+  gameKey   String // denormalized for quick queries
+  tier      Int      @default(0)
+  score     Int      @default(0) // run: score points · crossing: rows crossed
+  distance  Int      @default(0) // meters (run) / rows (crossing)
+  coins     Int      @default(0)
+  eggs      Int      @default(0)
+  gems      Int      @default(0)
+  xp        Int      @default(0)
+  result    String   @default("playing") // playing | win | loss | rejected
+  duration  Int      @default(0) // seconds
+  cheated   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game MiniGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([gameKey, createdAt])
+  @@index([gameKey, score])
+}
+
+model PlayerGameStats {
+  id           String @id @default(cuid())
+  userId       String @unique
+  totalGames   Int    @default(0)
+  wins         Int    @default(0)
+  losses       Int    @default(0)
+  highestScore Int    @default(0)
+  bestDistance Int    @default(0)
+  totalRewards Int    @default(0) // lifetime coins won in arcades
+  playTimeSec  Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ══════════ Phase 25 — Customer Support ══════════
+
+model Ticket {
+  id         String   @id @default(cuid())
+  userId     String
+  username   String
+  subject    String
+  category   String   @default("other") // bug | account | payment | market | other
+  status     String   @default("open") // open | answered | closed
+  assignedTo String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id         String   @id @default(cuid())
+  ticketId   String
+  sender     String // user | staff
+  senderName String
+  body       String
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Farm {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  coopLevel      Int       @default(1)
+  landLevel      Int       @default(1)
+  storageLevel   Int       @default(1)
+  lastFedAt      DateTime?
+  buffType       String?
+  buffExpiresAt  DateTime?
+  totalEggsHatch Int       @default(0)
+  totalEarned    Int       @default(0)
+
+  // Phase 11 — farm building system
+  incubatorLevel   Int @default(1) // 1..3 → 4/6/8 slots
+  feedFactoryLevel Int @default(0) // 0..3 → feed discount + free feed/day
+  shelterLevel     Int @default(0) // 0..3 → animal cap + animal prod bonus
+  xpBuffUntil      DateTime? // Phase 10 — XP tonic buff
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Hen {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String // normal | golden | royal | magic
+  name            String
+  level           Int      @default(1)
+  bornAt          DateTime @default(now())
+  lastCollectedAt DateTime @default(now())
+  status          String   @default("active") // active | retired
+
+  // Phase 8/3 — real-time life cycle + genetics
+  xp          Int       @default(0) // hen xp → levels up production
+  traits      String? // JSON array of trait keys
+  generation  Int       @default(1)
+  lastBreedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Animal {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String // cow | sheep | duck | dog | cat | horse
+  name            String
+  bornAt          DateTime @default(now())
+  lastCollectedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Egg {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String // normal | golden | royal | magic | diamond | mystery
+  status      String    @default("inventory") // inventory | incubating | ready | opened
+  incubatedAt DateTime?
+  hatchAt     DateTime?
+  openedAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String
+  amount      Int // signed: + credit / - debit
+  currency    String   @default("coins") // coins | gems
+  description String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MarketListing {
+  id         String    @id @default(cuid())
+  sellerId   String
+  sellerName String
+  itemType   String // hen | animal | egg
+  subType    String
+  title      String
+  detail     String?
+  level      Int       @default(1)
+  ageDays    Int       @default(0)
+  price      Int
+  status     String    @default("active") // active | sold | cancelled
+  buyerId    String?
+  createdAt  DateTime  @default(now())
+  soldAt     DateTime?
+}
+
+model UserMission {
+  id       String  @id @default(cuid())
+  userId   String
+  key      String
+  date     String // YYYY-MM-DD
+  progress Int     @default(0)
+  claimed  Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key, date])
+}
+
+model Withdrawal {
+  id          String    @id @default(cuid())
+  userId      String
+  username    String
+  amount      Int
+  method      String // bank | jazzcash | easypaisa | usdt
+  address     String // account number / IBAN / mobile / wallet address
+
+  // Phase 34 — full banking details + fee accounting
+  accountTitle String  @default("") // account holder name
+  bankName     String  @default("") // bank name (bank method only)
+  fee          Int     @default(0) // processing fee in coins (payout = amount - fee)
+  status      String    @default("pending") // pending | approved | rejected | hold
+  note        String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  processedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ══════════ Phase 34 — Wallet: manual deposits with payment proof ══════════
+
+model Deposit {
+  id          String    @id @default(cuid())
+  userId      String
+  username    String
+  amountCents Int       // USD cents sent by the user
+  method      String    // bank | jazzcash | easypaisa | usdt
+  senderName  String    // sender account title shown on receipt
+  reference   String    // transaction id / reference from the receipt
+  proof       String?   // payment proof image (data URL, client-side resized)
+  coins       Int       // base coins at conversion rate
+  bonusCoins  Int       @default(0) // deposit bonus credited
+  status      String    @default("pending") // pending | approved | rejected
+  note        String?
+  processedAt DateTime?
+  processedBy String?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model GameConfig {
+  key   String @id
+  value String
+}
+
+model GameEvent {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  multiplier  Int      @default(150) // percent, 150 = 1.5x
+  startsAt    DateTime @default(now())
+  endsAt      DateTime
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  ref       String? // dedup key for auto-generated notifications
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, ref])
+}
+
+// ══════════ Phase 10 — Inventory System ══════════
+
+model InventoryItem {
+  id     String @id @default(cuid())
+  userId String
+  key    String // medicine | vitamin | golden_feed | growth_shot | xp_tonic | egg_charm | scarecrow | feed_sack
+  qty    Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+// ══════════ Phase 12 — Multiplayer ══════════
+
+model Friend {
+  id        String   @id @default(cuid())
+  userId    String // initiator
+  friendId  String // receiver
+  status    String   @default("pending") // pending | accepted
+  lastGiftAt DateTime?
+  createdAt DateTime @default(now())
+
+  user   User @relation("friendInitiator", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("friendReceiver", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([friendId])
+}
+
+model Clan {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  tag         String // short badge e.g. GFC
+  description String   @default("")
+  emblem      String   @default("🛡️")
+  leaderId    String
+  leaderName  String
+  xp          Int      @default(0)
+  treasury    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  members ClanMember[]
+}
+
+model ClanMember {
+  id           String   @id @default(cuid())
+  clanId       String
+  userId       String   @unique
+  role         String   @default("member") // chief | officer | member
+  contribution Int      @default(0)
+  lastClaimAt  DateTime?
+  joinedAt     DateTime @default(now())
+
+  clan Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clanId])
+}
+
+// ══════════ Phase 13 — Marketplace price history ══════════
+
+model MarketTrade {
+  id        String   @id @default(cuid())
+  listingId String
+  itemType  String
+  subType   String
+  title     String
+  price     Int
+  sellerId  String
+  sellerName String
+  buyerId   String
+  buyerName String
+  createdAt DateTime @default(now())
+
+  @@index([itemType, subType])
+}
+
+// ══════════ Phase 15 — Monetization ══════════
+
+model Purchase {
+  id          String   @id @default(cuid())
+  userId      String
+  username    String
+  kind        String // gems | vip
+  sku         String // pack key or plan key
+  amountCents Int
+  currency    String   @default("USD")
+  method      String   @default("card") // card | bank | usdt | btc
+  coinsGiven  Int      @default(0)
+  gemsGiven   Int      @default(0)
+  status      String   @default("completed")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+}
+
+// ══════════ Phase 18 — Analytics ══════════
+
+model DailyStat {
+  date            String @id // YYYY-MM-DD
+  dau             Int    @default(0)
+  newUsers        Int    @default(0)
+  eggsLaid        Int    @default(0)
+  eggsHatched     Int    @default(0)
+  coinsGenerated  Int    @default(0)
+  coinsSpent      Int    @default(0)
+  marketVolume    Int    @default(0)
+  revenueCents    Int    @default(0)
+}
+
+// ══════════ Phase 16 — Security audit log ══════════
+
+model AdminLog {
+  id        String   @id @default(cuid())
+  adminId   String
+  adminName String
+  action    String
+  detail    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // rate_limit | price_abuse | bot_suspect | login_new_device
+  detail    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id // token
+  userId    String
+  userAgent String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
