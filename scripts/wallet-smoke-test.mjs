@@ -6,7 +6,7 @@
 //         saved payment profile, wallet reconciliation.
 // Run: node scripts/wallet-smoke-test.mjs
 // ═════════════════════════════════════════════════════════════
-const BASE = 'http://localhost:3000'
+const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
 let failed = 0

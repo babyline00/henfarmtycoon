@@ -17,7 +17,7 @@
 //   • SHA-256 password hashing                       → no memory hardness
 // ═════════════════════════════════════════════════════════════
 
-const BASE = process.argv[2] ?? 'http://localhost:3000'
+const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
 let failed = 0
@@ -65,10 +65,20 @@ async function makeStaff(adminToken, username, role) {
   const list = await api('/api/admin/users?q=' + encodeURIComponent(username), { token: adminToken })
   const row = list.data.users?.find(u => u.username === username)
   if (!row) throw new Error(`could not find ${username} in admin search`)
-  const res = await api('/api/admin/users', {
+  // set_role is rate-limited, and this suite promotes several accounts in a
+  // row. A back-to-back re-run lands inside that window, so wait it out
+  // rather than failing on a limit that is working as designed.
+  let res = await api('/api/admin/users', {
     method: 'POST', token: adminToken,
     body: { userId: row.id, action: 'set_role', role },
   })
+  for (let tries = 3; res.status === 429 && tries > 0; tries--) {
+    await new Promise(r => setTimeout(r, 5000))
+    res = await api('/api/admin/users', {
+      method: 'POST', token: adminToken,
+      body: { userId: row.id, action: 'set_role', role },
+    })
+  }
   if (res.status !== 200) throw new Error(`set_role ${username}→${role} failed: ${JSON.stringify(res.data)}`)
   return row.id
 }
@@ -90,7 +100,9 @@ async function main() {
 
   // Legacy admin rows must have been backfilled, otherwise can() now
   // fails closed and the operator is locked out of their own console.
-  const usersRes = await api('/api/admin/users', { token: A })
+  // Query by name: the unfiltered list is capped at the newest 60 users,
+  // so `admin` scrolls out of it as soon as the suite is re-run.
+  const usersRes = await api('/api/admin/users?q=admin', { token: A })
   const adminRow = usersRes.data.users?.find(u => u.username === 'admin')
   check('Seeded admin has an explicit adminRole (no null-role lockout)', adminRow?.adminRole === 'super', `got ${adminRow?.adminRole}`)
 

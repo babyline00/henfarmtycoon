@@ -1,5 +1,5 @@
 // Phase 33 / 25 / 26 / 27 — API smoke test
-const BASE = 'http://localhost:3000'
+const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 let failures = 0
 
 function check(name, cond, extra = '') {
@@ -29,10 +29,19 @@ async function reqRetry(path, opts, tries = 3) {
 }
 
 async function main() {
-  // ── login ──
-  const login = await req('/api/auth', { method: 'POST', body: { action: 'login', username: 'demo', password: 'demo123' } })
-  check('demo login', login.status === 200 && login.data.token, JSON.stringify(login.data).slice(0, 80))
-  const token = login.data.token
+  // ── a fresh player ──
+  // Deliberately NOT the shared `demo` account. Arcade play mutates
+  // per-account state (energy pool + a 6-starts-per-minute rate-limit
+  // bucket), so a second run against a long-lived account starts too low
+  // to play and trips the limiter. A new account gets 100 energy and an
+  // empty bucket, which makes this suite repeatable.
+  const uname = `arcade${Date.now().toString().slice(-8)}`
+  const reg = await req('/api/auth', {
+    method: 'POST',
+    body: { action: 'register', username: uname, password: 'test1234', farmName: `Arcade ${uname.slice(-4)}` },
+  })
+  check('fresh arcade player registered', reg.status === 200 && reg.data.token, JSON.stringify(reg.data).slice(0, 80))
+  const token = reg.data.token
 
   const adminLogin = await req('/api/auth', { method: 'POST', body: { action: 'login', username: 'admin', password: 'admin123' } })
   check('admin login', adminLogin.status === 200 && adminLogin.data.token)
@@ -43,11 +52,8 @@ async function main() {
   check('GET /api/mini 200', hub.status === 200, JSON.stringify(hub.data).slice(0, 100))
   check('hub has 2 games', hub.data.games?.length === 2)
   const energyBefore = hub.data.energy?.energy ?? 0
-  // Energy regenerates 20/hour, so a second run against the same database
-  // starts too low to play. That is shared-state pollution, not a code
-  // defect, so say how to recover rather than failing opaquely.
-  check('hub energy >= 50 for test plays', energyBefore >= 50,
-    `got ${energyBefore} — recover with: bun run scripts/reset-arcade.ts demo`)
+  // A fresh account starts at MAX_ENERGY and this suite spends 30.
+  check('hub energy >= 50 for test plays', energyBefore >= 50, `got ${energyBefore}`)
   check('hub leaderboards present', hub.data.leaderboards?.chicken_run && hub.data.leaderboards?.road_crossing)
   check('hub season rewards', hub.data.seasonRewards?.length === 3)
   check('hub tier info', hub.data.tierInfo?.length === 5)
@@ -93,9 +99,14 @@ async function main() {
   check('road crossing win', finish3.data.result === 'win', JSON.stringify(finish3.data).slice(0, 150))
   check('win grants champion buff message', (finish3.data.message ?? '').includes('Champion') || finish3.data.championBuff === true || true)
 
-  // hub again — stats updated
+  // hub again — stats updated.
+  // totalGames counts COMPLETED sessions only: the two legitimate finishes
+  // (one loss, one win). The cheat session was rejected and never
+  // reaches the stats upsert, which is the point of the check above.
   const hub2 = await req('/api/mini', { token })
-  check('stats updated after plays', hub2.data.stats.totalGames >= 3, `got ${hub2.data.stats?.totalGames}`)
+  check('stats count only the two completed plays', hub2.data.stats.totalGames === 2, `got ${hub2.data.stats?.totalGames}`)
+  check('one win and one loss recorded', hub2.data.stats.wins === 1 && hub2.data.stats.losses === 1,
+    `wins=${hub2.data.stats?.wins} losses=${hub2.data.stats?.losses}`)
   check('leaderboard has scores', (hub2.data.leaderboards.chicken_run.daily.length + hub2.data.leaderboards.road_crossing.daily.length) > 0)
 
   // ── Phase 27: AI advisor ──
@@ -181,12 +192,12 @@ async function main() {
   const gs = await req('/api/game/state', { token })
   check('game state 200', gs.status === 200)
 
-  // ── cleanup: clear flags the intentional cheat test placed on demo ──
-  const users = await req('/api/admin/users?q=demo', { token: adminToken })
-  const demoUser = users.data.users?.find(u => u.username === 'demo')
-  if (demoUser?.flagged) {
-    const un = await req('/api/admin/users', { method: 'POST', body: { userId: demoUser.id, action: 'unflag' }, token: adminToken })
-    check('demo unflagged after cheat-test cleanup', un.status === 200)
+  // ── cleanup: clear the flag the intentional cheat test just placed ──
+  const users = await req(`/api/admin/users?q=${uname}`, { token: adminToken })
+  const player = users.data.users?.find(u => u.username === uname)
+  if (player?.flagged) {
+    const un = await req('/api/admin/users', { method: 'POST', body: { userId: player.id, action: 'unflag' }, token: adminToken })
+    check('cheat-test flag cleared', un.status === 200)
   }
 
   console.log(failures === 0 ? `\n🏆 ALL SMOKE TESTS PASSED` : `\n💥 ${failures} FAILURES`)

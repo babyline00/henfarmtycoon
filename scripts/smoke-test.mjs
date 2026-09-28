@@ -8,7 +8,7 @@
 // clans), admin analytics/security, wallet reconciliation.
 // ═════════════════════════════════════════════════════════════
 
-const BASE = process.argv[2] ?? 'http://localhost:3000'
+const BASE = process.env.SMOKE_BASE_URL ?? process.argv[2] ?? 'http://localhost:3000'
 
 let passed = 0
 let failed = 0
@@ -133,6 +133,8 @@ async function main() {
   const demoLogin = await api('/api/auth', { method: 'POST', body: { action: 'login', username: 'demo', password: 'demo123' } })
   check('Demo login works', demoLogin.status === 200)
   const demoToken = demoLogin.data.token
+  const demoState = await api('/api/game/state', { token: demoToken })
+  const demoId = demoState.data.user?.id
   const demoSocial = await api('/api/social', { token: demoToken })
   const reqRow = demoSocial.data.requests?.[0]
   check('Demo sees pending request', !!reqRow)
@@ -142,7 +144,11 @@ async function main() {
   }
   const gift = await api('/api/game/action', { method: 'POST', token: demoToken, body: { action: 'gift_friend', friendUserId: uid } })
   check('Gift sent to friend', gift.status === 200, JSON.stringify(gift.data))
-  const help = await api('/api/game/action', { method: 'POST', token: demoToken, body: { action: 'help_friend', friendUserId: uid } })
+  // help_friend has a 5/day cap per helper. `demo` is a long-lived shared
+  // account, so asking it to help makes the suite fail on every re-run.
+  // The fresh account registered above is already a friend of demo and has
+  // spent none of its cap, so it is the helper here.
+  const help = await api('/api/game/action', { method: 'POST', token, body: { action: 'help_friend', friendUserId: demoId } })
   check('Help friend works', help.status === 200, JSON.stringify(help.data))
 
   // visit friend's farm
