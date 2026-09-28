@@ -132,6 +132,21 @@ unlocking only on those meant a returning player (any page load with an
 existing session) had a suspended SFX context, so `play()` bailed out and the
 first several taps were completely silent.
 
+## Arcade
+
+Three mini-games — `chicken_run`, `road_crossing`, `egg_catch` — all
+server-authoritative. The client reports raw telemetry; every reward is
+recomputed and re-validated server-side.
+
+The physics lives in `src/lib/mini-games.ts` and is imported by **both** the
+canvas games and the anti-cheat validator, because when they each had their
+own numbers the validator rejected honest play twice over: Chicken Run
+flagged full-speed runs as impossible from level 10 up, and Road Crossing
+voided any crossing faster than 1 row/second when the client allowed 5.9.
+A validator that disagrees with the physics is not a validator.
+
+See [`docs/ARCADE.md`](docs/ARCADE.md) for the full write-up and roadmap.
+
 ## Project layout
 
 ```

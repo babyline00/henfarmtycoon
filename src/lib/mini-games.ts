@@ -38,7 +38,7 @@ export function computeEnergy(
 
 // ── game definitions ─────────────────────────────────────────
 
-export type MiniGameKey = 'chicken_run' | 'road_crossing'
+export type MiniGameKey = 'chicken_run' | 'road_crossing' | 'egg_catch'
 
 export interface GameTier {
   key: string
@@ -92,6 +92,12 @@ export const MINI_GAME_DEFS: Record<MiniGameKey, MiniGameDef> = {
     defaultEnergyCost: 15, color: 'teal',
     winTarget: 12, coinsPerMeter: 0, coinsPerRow: 40, xpCap: 250,
   },
+  egg_catch: {
+    key: 'egg_catch', name: 'Egg Catch', emoji: '🥚',
+    desc: 'Catcher — sweep the basket, scoop eggs and coins, and keep the rocks out.',
+    defaultEnergyCost: 8, color: 'green',
+    winTarget: 25, coinsPerMeter: 0, coinsPerRow: 0, xpCap: 250,
+  },
 }
 
 // obstacles (rendered as emoji by the canvas client; purely cosmetic server-side)
@@ -122,14 +128,151 @@ export const SEASON_REWARDS = [
   { rank: 3, prize: '5,000 Gems', emoji: '💎', detail: 'A mountain of premium gems' },
 ]
 
-// ── server-authoritative validation + reward math ────────────
+// ── physics contract ─────────────────────────────────────────
+// ONE source of truth, imported by both the canvas games and the server
+// validator. This module is deliberately dependency-free so the client can
+// import it without dragging the server along.
+//
+// It exists because the two used to disagree, and the anti-cheat was the
+// side that lost. Two bugs came out of it:
+//
+//   • Chicken Run's cap was a hand-picked 30 m/s while the client's own
+//     speed ceiling is 24 m/s × the tier multiplier. On the "city" tier
+//     that is 31.2 m/s, so a player running at full speed was rejected as
+//     a cheater — and flagged for review — from level 10 upward.
+//   • Road Crossing's cap demanded 1 row/second while the client let you
+//     advance a row every 0.17 s. Crossing the 12-row win target took 2
+//     seconds of honest play and the server voided it.
+//
+// Deriving the bounds from the same constants the game runs on is the fix.
+// A validator that disagrees with the physics is not a validator.
 
-// Plausibility bounds — anything beyond these is physically
-// impossible for a human and treated as cheating.
-export const RUN_MAX_SPEED_MPS = 30 // generous: ~108 km/h top theoretical
+// ── Chicken Run ──
+/** Speed the ramp starts at. */
+export const RUN_START_SPEED_MPS = 8
+/** Speed the ramp tops out at, before the tier multiplier. */
+export const RUN_BASE_SPEED_MPS = 24
+/** Metres over which the ramp climbs from start to ceiling. */
+export const RUN_RAMP_METRES = 140
 export const RUN_MAX_DURATION_SEC = 300
-export const CROSS_MIN_SEC_PER_ROW = 1.0 // fastest realistic row advance
+/** Jump arc length, in metres-equivalent pixels. Mirrors the client. */
+export const RUN_JUMP_HEIGHT = 72
+
+// ── Road Crossing ──
+/**
+ * Minimum seconds between advancing a row. This is a pacing rule, not
+ * just an anti-cheat bound: at 0.17 s per hop a 12-row crossing finished
+ * in two seconds, which is too short to read the traffic, let alone
+ * survive it.
+ */
+export const CROSS_MIN_SEC_PER_ROW = 1.0
+/** With the ⚡ speed power-up the floor drops, so the power-up is real. */
+export const CROSS_MIN_SEC_PER_ROW_FAST = 0.6
+/** Minimum seconds between hop *inputs*, which stops double-tapping a row. */
+export const CROSS_HOP_INPUT_COOLDOWN = 0.17
+export const CROSS_HOP_INPUT_COOLDOWN_FAST = 0.10
 export const CROSS_MAX_DURATION_SEC = 600
+
+// ── Egg Catch ──
+/**
+ * The first game to run on a fixed LOGICAL field rather than raw pixels.
+ * The other two derive their geometry from `canvas.clientWidth`, so the
+ * same session plays differently on a phone and a desktop, and their
+ * collision maths moves with the viewport. Egg Catch simulates in logical
+ * units and scales only at draw time, so behaviour is identical on every
+ * screen — which is also what makes the plausibility maths below exact.
+ */
+export const CATCH_FIELD_W = 1000
+export const CATCH_FIELD_H = 700
+/** Catch rate at the start of a run, items/second. */
+export const CATCH_RATE_START = 1.8
+/** …and once the ramp completes. */
+export const CATCH_RATE_MAX = 3.6
+/** Seconds over which the rate ramps. */
+export const CATCH_RAMP_SEC = 45
+/** Fall speed, logical units/second. */
+export const CATCH_FALL_START = 220
+export const CATCH_FALL_MAX = 540
+export const CATCH_FALL_RAMP_SEC = 50
+export const CATCH_MAX_DURATION_SEC = 180
+/** Egg Catch's target does not scale with the tier. */
+export const CATCH_MAX_CATCH_RATE = CATCH_RATE_MAX
+
+export function catchFallSpeed(sec: number): number {
+  const t = Math.min(1, Math.max(0, sec / CATCH_FALL_RAMP_SEC))
+  return CATCH_FALL_START + (CATCH_FALL_MAX - CATCH_FALL_START) * t
+}
+
+export function catchSpawnRate(sec: number): number {
+  const t = Math.min(1, Math.max(0, sec / CATCH_RAMP_SEC))
+  return CATCH_RATE_START + (CATCH_RATE_MAX - CATCH_RATE_START) * t
+}
+
+/**
+ * Most items that can possibly have fallen in `durationSec`. Integral of
+ * the spawn rate, sampled rather than solved so it tracks the ramp exactly
+ * — this is the anti-cheat ceiling for catches.
+ */
+export function catchMaxItems(durationSec: number): number {
+  const STEP = 0.25
+  let total = 0
+  for (let t = 0; t < durationSec; t += STEP) {
+    total += catchSpawnRate(t) * STEP
+  }
+  return Math.floor(total) + 2
+}
+
+// ── how much slop the validator allows ───────────────────────
+// A real client has frame jitter, a throttled tab and network latency, so
+// the validator has to be a little more generous than the client. It must
+// never be *tighter*, or skill is punished as cheating.
+const SPEED_HEADROOM = 1.15
+const ROW_HEADROOM = 2
+
+export function speedMultOf(tier: number): number {
+  return GAME_TIERS[Math.min(Math.max(0, tier), GAME_TIERS.length - 1)]?.speedMult ?? 1
+}
+
+/** Fastest the client can actually move on a tier, m/s. */
+export function runMaxSpeedMps(tier: number): number {
+  return RUN_BASE_SPEED_MPS * speedMultOf(tier)
+}
+
+/**
+ * Road Crossing needs one more row to win on harder tiers, so the tier
+ * target has to be a function of the tier rather than a constant. The
+ * server publishes this and the client uses it — previously the client
+ * added its own `tier * 4` while the server compared against the bare
+ * target, so on a high tier the server declared a win the client never
+ * showed, and the player kept hopping toward a goal that had already
+ * paid out.
+ */
+export function crossWinTarget(tier: number, baseTarget: number): number {
+  return baseTarget + Math.min(Math.max(0, tier), GAME_TIERS.length - 1) * 4
+}
+
+/**
+ * The win target for a game on a tier. Road Crossing needs one more row per
+ * tier because the roads get busier; Chicken Run does not scale its
+ * target. Published to the client at session start so the two can never
+ * disagree about when a run is won.
+ */
+export function winTargetFor(gameKey: string, tier: number): number {
+  const base = MINI_GAME_DEFS[gameKey as keyof typeof MINI_GAME_DEFS]?.winTarget ?? 0
+  // Only Road Crossing scales: its roads get busier with the tier, so the
+  // crossing has to get longer. The others keep a fixed target.
+  return gameKey === 'road_crossing' ? crossWinTarget(tier, base) : base
+}
+
+/** Plausibility ceiling for a run, in metres, for a given duration. */
+export function runMaxDistance(tier: number, durationSec: number): number {
+  return Math.floor(durationSec * runMaxSpeedMps(tier) * SPEED_HEADROOM)
+}
+
+/** Plausibility ceiling for rows crossed in a given duration. */
+export function crossMaxRows(durationSec: number): number {
+  return Math.floor(durationSec / CROSS_MIN_SEC_PER_ROW_FAST) + ROW_HEADROOM
+}
 
 export interface RunTelemetry {
   distance: number
@@ -178,7 +321,7 @@ export function evaluateRun(
   if (durationSec > RUN_MAX_DURATION_SEC) {
     return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
-  const maxDist = Math.floor(durationSec * RUN_MAX_SPEED_MPS)
+  const maxDist = runMaxDistance(tier, durationSec)
   if (dist > maxDist) {
     return { ok: false, cheated: true, reason: `Distance ${dist}m impossible in ${durationSec}s`, result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
@@ -228,7 +371,7 @@ export function evaluateCross(
   if (durationSec > CROSS_MAX_DURATION_SEC) {
     return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
-  const maxRows = Math.floor(durationSec / CROSS_MIN_SEC_PER_ROW) + 2
+  const maxRows = crossMaxRows(durationSec)
   if (score > maxRows) {
     return { ok: false, cheated: true, reason: `${score} rows impossible in ${durationSec}s`, result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
   }
@@ -236,7 +379,11 @@ export function evaluateCross(
   const maxCoins = score * 4
   const coins = capN(tel.coins, maxCoins)
 
-  const win = score >= MINI_GAME_DEFS.road_crossing.winTarget
+  // The win threshold is tier-dependent, and this is the same function the
+  // client is given at session start. Comparing against the bare base
+  // target here meant a hard-tier player was paid a win the client never
+  // displayed.
+  const win = score >= crossWinTarget(tier, MINI_GAME_DEFS.road_crossing.winTarget)
   const rowCoins = Math.floor(score * MINI_GAME_DEFS.road_crossing.coinsPerRow)
   const pickupCoins = coins * 10
   const winBonus = win ? Math.floor(250 * mult) : 0
@@ -256,6 +403,81 @@ export function evaluateCross(
     ok: true, cheated: false, result: win ? 'win' : 'loss',
     coins: totalCoins, eggs, gems, xp: totalXp,
     mysteryItem: null,
+    lines,
+  }
+}
+
+// ── Egg Catch ────────────────────────────────────────────────
+
+export interface CatchTelemetry {
+  /** Eggs scooped into the basket. This is the score. */
+  eggs: number
+  coins: number
+  gems: number
+  boxes: number
+  /** Missed hazards. Informational; does not gate rewards. */
+  missed: number
+}
+
+/**
+ * The catcher.
+ *
+ * Every count is capped by the number of items that can physically have
+ * fallen in the time given — `catchMaxItems` integrates the spawn-rate
+ * ramp — so a client cannot claim catches it could not have made. The
+ * cap is shared, not per-category, because it is the *total* number of
+ * falling items that is bounded; splitting it would let a client claim
+ * the full allowance in every category at once.
+ */
+export function evaluateCatch(
+  tel: CatchTelemetry,
+  tier: number,
+  durationSec: number
+): RewardOutcome {
+  const lines: string[] = []
+  const claimed = Math.max(0, Math.floor(tel.eggs) + Math.floor(tel.coins) + Math.floor(tel.gems) + Math.floor(tel.boxes))
+
+  if (durationSec > CATCH_MAX_DURATION_SEC) {
+    return { ok: false, cheated: true, reason: 'Session duration exceeded limit', result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines }
+  }
+
+  const allowance = catchMaxItems(durationSec)
+  if (claimed > allowance) {
+    return {
+      ok: false, cheated: true,
+      reason: `${claimed} catches impossible in ${durationSec}s (at most ${allowance} can fall)`,
+      result: 'rejected', coins: 0, eggs: 0, gems: 0, xp: 0, lines,
+    }
+  }
+
+  const mult = tierMultOf(tier)
+  const def = MINI_GAME_DEFS.egg_catch
+  const eggs = capN(tel.eggs, allowance)
+  const coins = capN(tel.coins, Math.max(0, allowance - eggs))
+  const gemsCaught = capN(tel.gems, Math.max(0, allowance - eggs - coins))
+  const boxes = capN(tel.boxes, Math.max(0, allowance - eggs - coins - gemsCaught))
+
+  const win = eggs >= def.winTarget
+  const eggCoins = eggs * 6
+  const pickupCoins = coins * 10 + gemsCaught * 40
+  const winBonus = win ? Math.floor(200 * mult) : 0
+  const totalCoins = Math.floor((eggCoins + pickupCoins + winBonus) * mult)
+  // Gems are a rare payout, so a handful is the ceiling however many were
+  // claimed — otherwise gems dominate every other reward in the game.
+  const gems = Math.min(3, gemsCaught)
+  const totalXp = Math.min(def.xpCap, eggs * 3 + coins + (win ? 50 : 0))
+
+  if (eggs > 0) lines.push(`🥚 ${eggs} egg(s) scooped → 🪙 ${eggCoins}`)
+  if (coins > 0) lines.push(`🪙 ${coins} coin(s) → 🪙 ${coins * 10}`)
+  if (gemsCaught > 0) lines.push(`💎 ${gemsCaught} gem(s) → 🪙 ${gemsCaught * 40}`)
+  if (winBonus > 0) lines.push(`🏆 Victory bonus → 🪙 ${winBonus} (×${mult} tier)`)
+  if (mult > 1) lines.push(`⚡ ${GAME_TIERS[tier]?.name ?? 'Tier'} multiplier ×${mult}`)
+  if (boxes > 0) lines.push(`🎁 ${boxes} mystery box(es) opened`)
+
+  return {
+    ok: true, cheated: false, result: win ? 'win' : 'loss',
+    coins: totalCoins, eggs: 0, gems, xp: totalXp,
+    mysteryItem: boxes > 0 ? 'true' : null,
     lines,
   }
 }

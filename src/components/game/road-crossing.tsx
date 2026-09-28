@@ -3,6 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+// Shared physics: the row-pacing floor here and the server's plausibility
+// check come from the same constants. They used to disagree by ~6x — the
+// client let you advance a row every 0.17s while the server demanded one
+// per second, so crossing the 12-row target took 2 seconds of honest play
+// and came back "12 rows impossible in 3s" with the account flagged.
+import {
+  CROSS_MIN_SEC_PER_ROW, CROSS_MIN_SEC_PER_ROW_FAST,
+  CROSS_HOP_INPUT_COOLDOWN, CROSS_HOP_INPUT_COOLDOWN_FAST,
+  crossWinTarget,
+} from '@/lib/mini-games'
 
 //══════════ MiniGame 2: Chicken Road Crossing (frogger) ══════════
 // Hop cell-by-cell across endless roads · dodge cars, trucks, motorcycles & tractors
@@ -48,7 +58,7 @@ const POWER_KEYS = ['shield', 'magnet', 'speed', 'freeze'] as const
 export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQuit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hud, setHud] = useState({
-    row: 0, target: winTarget + tier * 4, lives: MAX_LIVES, coins: 0,
+    row: 0, target: crossWinTarget(tier, winTarget), lives: MAX_LIVES, coins: 0,
     powers: [] as { key: string; left: number }[], night: tier >= 2, frozen: 0,
   })
   const [ended, setEnded] = useState<null | 'win' | 'loss'>(null)
@@ -56,7 +66,7 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
   const onEndRef = useRef(onEnd)
   useEffect(() => { onEndRef.current = onEnd })
 
-  const target = winTarget + tier * 4
+  const target = crossWinTarget(tier, winTarget)
   const stateRef = useRef({
     col: 2, row: 0, renderRow: 0,
     hopT: -1, hopFromRow: 0, hopFromCol: 2,
@@ -65,6 +75,7 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     shield: 0, magnet: 0, speed: 0, freeze: 0,
     rows: [] as Row[],
     hopCooldown: 0,
+    rowCooldown: 0,
     trimmedTo: 0,
     time: 0, running: true,
   })
@@ -97,6 +108,7 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     let CELL = W / COLS
 
     const resize = () => {
+      const prevW = W
       W = canvas.clientWidth
       H = canvas.clientHeight
       if (W === 0 || H === 0) return
@@ -105,6 +117,18 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
       canvas.height = Math.round(H * dpr)
       // setTransform, not scale: scale() accumulates across calls.
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      // Rows are generated once, against whatever W happened to be at the
+      // time. Rotating the device changed W, which left every vehicle
+      // clustered into one edge of the new, wider road — the traffic
+      // bunched up and the crossing became trivially easy. Rescale by the
+      // ratio so the road keeps its shape. stateRef is read directly
+      // because `s` is not initialised until after the first resize call.
+      if (prevW > 0 && W > 0 && prevW !== W) {
+        const ratio = W / prevW
+        for (const r of stateRef.current.rows) {
+          for (const v of r.vehicles) v.x *= ratio
+        }
+      }
     }
     resize()
 
@@ -165,9 +189,17 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
     ensureRows(30)
 
     // ── input ──
+    // Two separate gates, which used to be one and were the bug:
+    //   hopCooldown — a short lockout so one tap cannot fire two hops
+    //   rowCooldown — the pacing floor on ADVANCING a row, matching the
+    //                 floor the server validator enforces
+    // Sideways movement stays free: dodging sideways is the reactive part
+    // of a frogger and gating it makes the game feel broken, while the
+    // server only ever counts rows.
     function hop(dc: number, dr: number) {
       if (!s.running || endedRef.current) return
       if (s.hopCooldown > 0) return
+      if (dr !== 0 && s.rowCooldown > 0) return
       const nc = Math.max(0, Math.min(COLS - 1, s.col + dc))
       const nr = Math.max(0, s.row + dr)
       if (nc === s.col && nr === s.row) return
@@ -176,7 +208,11 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
       s.col = nc
       s.row = nr
       s.hopT = 0
-      s.hopCooldown = s.speed > 0 ? 0.1 : 0.17
+      const fast = s.speed > 0
+      s.hopCooldown = fast ? CROSS_HOP_INPUT_COOLDOWN_FAST : CROSS_HOP_INPUT_COOLDOWN
+      if (dr > 0) {
+        s.rowCooldown = fast ? CROSS_MIN_SEC_PER_ROW_FAST : CROSS_MIN_SEC_PER_ROW
+      }
     }
 
     let touchStart: { x: number; y: number } | null = null
@@ -221,7 +257,7 @@ export function RoadCrossing({ tier, tierName, speedMult, winTarget, onEnd, onQu
       s.time += dt
 
       // timers
-      for (const k of ['invuln', 'shield', 'magnet', 'speed', 'freeze', 'hopCooldown'] as const) {
+      for (const k of ['invuln', 'shield', 'magnet', 'speed', 'freeze', 'hopCooldown', 'rowCooldown'] as const) {
         if (s[k] > 0) (s[k] as number) = Math.max(0, (s[k] as number) - dt)
       }
       if (s.hopT >= 0) {

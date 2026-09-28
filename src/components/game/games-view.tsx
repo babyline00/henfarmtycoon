@@ -6,6 +6,8 @@ import { api, useGame } from '@/lib/store'
 import { GameCard, SectionTitle, LoadingSpinner, ProgressBar, EmptyState } from './shared'
 import { ChickenRun } from './chicken-run'
 import { RoadCrossing } from './road-crossing'
+import { EggCatch } from './egg-catch'
+import type { MiniGameKey } from '@/lib/mini-games'
 import { cn } from '@/lib/utils'
 
 // ══════════ Phase 33 — Mini Games Hub ══════════
@@ -68,8 +70,21 @@ export interface FinishResult {
   message?: string
 }
 
+// Per-game presentation for the recent-sessions list. Keyed rather than
+// nested ternaries so adding a game does not mean rewriting the chain.
+const GAME_ICON: Record<string, string> = {
+  chicken_run: '🏃', road_crossing: '🚦', egg_catch: '🥚',
+}
+const GAME_SCORE: Record<string, (s: { distance: number; score: number }) => string> = {
+  chicken_run: (s) => `${s.distance}m`,
+  road_crossing: (s) => `${s.score} roads`,
+  egg_catch: (s) => `${s.score} eggs`,
+}
+
 type ActiveGame = {
-  key: 'chicken_run' | 'road_crossing'
+  // Kept in step with MiniGameKey rather than repeating the union, so
+  // adding a game does not silently exclude it from the dispatcher.
+  key: MiniGameKey
   sessionId: string
   tier: number
   tierName: string
@@ -129,7 +144,7 @@ export function GamesView() {
         body: { action: 'start', gameKey: game.key },
       })
       setActive({
-        key: game.key as 'chicken_run' | 'road_crossing',
+        key: game.key as MiniGameKey,
         sessionId: res.sessionId!, tier: res.tier!, tierName: res.tierName!,
         tierMult: res.tierMult!, speedMult: res.speedMult!, winTarget: res.winTarget!,
       })
@@ -160,6 +175,14 @@ export function GamesView() {
   if (active) {
     if (active.key === 'chicken_run') {
       return <ChickenRun sessionId={active.sessionId}
+        tier={active.tier} tierName={active.tierName}
+        speedMult={active.speedMult} winTarget={active.winTarget}
+        onEnd={(tel) => finishGame(active.sessionId, tel)}
+        onQuit={() => setActive(null)}
+      />
+    }
+    if (active.key === 'egg_catch') {
+      return <EggCatch sessionId={active.sessionId}
         tier={active.tier} tierName={active.tierName}
         speedMult={active.speedMult} winTarget={active.winTarget}
         onEnd={(tel) => finishGame(active.sessionId, tel)}
@@ -347,12 +370,12 @@ export function GamesView() {
           <GameCard>
             {hub.recentSessions.map(s => (
               <div key={s.id} className="flex items-center gap-2 border-b border-stone-100 py-1.5 text-[11px] last:border-0">
-                <span aria-hidden="true">{s.gameKey === 'chicken_run' ? '🏃' : '🚦'}</span>
+                <span aria-hidden="true">{GAME_ICON[s.gameKey] ?? '🎮'}</span>
                 <span className={cn('font-black', s.result === 'win' ? 'text-green-700' : 'text-stone-600')}>
                   {s.result === 'win' ? 'WIN' : 'LOSS'}
                 </span>
                 <span className="flex-1 tabular-nums text-stone-600">
-                  {s.gameKey === 'chicken_run' ? `${s.distance}m` : `${s.score} roads`} · {new Date(s.createdAt).toLocaleDateString()}
+                  {GAME_SCORE[s.gameKey]?.(s) ?? `${s.score}`} · {new Date(s.createdAt).toLocaleDateString()}
                 </span>
                 <span className="font-bold tabular-nums text-amber-700">🪙{s.coins}</span>
               </div>

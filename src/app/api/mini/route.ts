@@ -3,7 +3,7 @@ import { getUserFromRequest, json, err } from '@/lib/auth'
 import { getConfig, adjustBalance, addXp, bumpMission, bumpDailyStat, notify } from '@/lib/economy'
 import {
   computeEnergy, MINI_GAME_DEFS, GAME_TIERS, SEASON_REWARDS,
-  tierForLevel, evaluateRun, evaluateCross, rollMysteryItem,
+  tierForLevel, evaluateRun, evaluateCross, evaluateCatch, rollMysteryItem, winTargetFor,
 } from '@/lib/mini-games'
 import { ITEM_TYPES, numericLevel } from '@/lib/game'
 import { checkRate, logSecurityEvent, flagUser } from '@/lib/security'
@@ -194,7 +194,7 @@ export async function POST(req: Request) {
       tierName: GAME_TIERS[tier].name,
       tierMult: GAME_TIERS[tier].mult,
       speedMult: GAME_TIERS[tier].speedMult,
-      winTarget: MINI_GAME_DEFS[gameKey as keyof typeof MINI_GAME_DEFS].winTarget,
+      winTarget: winTargetFor(gameKey, tier),
       energyLeft: energy.energy - game.energyCost,
     })
   }
@@ -233,6 +233,14 @@ export async function POST(req: Request) {
         score: num(body.score),
         coins: num(body.coins),
         powerUps: num(body.powerUps),
+      }, session.tier, durationSec)
+    } else if (session.gameKey === 'egg_catch') {
+      outcome = evaluateCatch({
+        eggs: num(body.eggs),
+        coins: num(body.coins),
+        gems: num(body.gems),
+        boxes: num(body.boxes),
+        missed: num(body.missed),
       }, session.tier, durationSec)
     } else {
       return err('Unknown game')
@@ -301,7 +309,10 @@ export async function POST(req: Request) {
 
     // stats + session record
     const distanceMetric = session.gameKey === 'chicken_run' ? num(body.distance) : 0
-    const scoreMetric = session.gameKey === 'chicken_run' ? num(body.distance) : num(body.score)
+    // The catcher reports eggs as its score; only the runner has a distance.
+    const scoreMetric = session.gameKey === 'chicken_run' ? num(body.distance)
+      : session.gameKey === 'egg_catch' ? num(body.eggs)
+        : num(body.score)
 
     await db.gameSession.update({
       where: { id: session.id },

@@ -170,6 +170,16 @@ async function main() {
       rewardConfig: JSON.stringify({ coinsPerRow: 40, winTarget: 12 }),
     },
   })
+  await db.miniGame.upsert({
+    where: { key: 'egg_catch' },
+    update: {},
+    create: {
+      key: 'egg_catch', name: 'Egg Catch', emoji: '🥚',
+      description: 'Catcher — sweep the basket, scoop eggs and coins, and keep the rocks out.',
+      enabled: true, energyCost: 8,
+      rewardConfig: JSON.stringify({ winTarget: 25 }),
+    },
+  })
 
   // ── market trade history for price stats (Phase 13) ──
   const tradeCount = await db.marketTrade.count()

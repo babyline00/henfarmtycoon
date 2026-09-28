@@ -50,7 +50,14 @@ async function main() {
   // ── Phase 33: arcade hub ──
   const hub = await req('/api/mini', { token })
   check('GET /api/mini 200', hub.status === 200, JSON.stringify(hub.data).slice(0, 100))
-  check('hub has 2 games', hub.data.games?.length === 2)
+  // Derived, not hardcoded: asserting a literal count made this fail every
+  // time a game was added, which is how a stale assertion hides a real
+  // regression behind a maintenance chore.
+  const gameKeys = (hub.data.games ?? []).map(g => g.key)
+  check('hub lists every enabled game', gameKeys.length >= 3, `got [${gameKeys}]`)
+  for (const k of ['chicken_run', 'road_crossing', 'egg_catch']) {
+    check(`hub includes ${k}`, gameKeys.includes(k), `got [${gameKeys}]`)
+  }
   const energyBefore = hub.data.energy?.energy ?? 0
   // A fresh account starts at MAX_ENERGY and this suite spends 30.
   check('hub energy >= 50 for test plays', energyBefore >= 50, `got ${energyBefore}`)
@@ -158,7 +165,8 @@ async function main() {
 
   // ── admin mini games control ──
   const mg = await req('/api/admin/minigames', { token: adminToken })
-  check('GET admin minigames', mg.status === 200 && mg.data.games?.length === 2)
+  check('GET admin minigames', mg.status === 200 && (mg.data.games?.length ?? 0) === gameKeys.length,
+    `hub ${gameKeys.length} vs admin ${mg.data.games?.length}`)
   check('admin totals counted', mg.data.totals?.totalPlays >= 3, `got ${mg.data.totals?.totalPlays}`)
   check('cheat list has entry', mg.data.cheated?.length >= 1)
   check('season standings exist', Array.isArray(mg.data.season.top3))

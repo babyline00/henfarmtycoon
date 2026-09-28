@@ -3,6 +3,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+// The physics lives in lib/mini-games so the server validator and this
+// game cannot disagree. They used to: the client topped out at
+// 24 m/s × the tier multiplier while the server capped at a hand-picked
+// 30, so from the "city" tier upward a player running at full speed was
+// rejected as a cheater and flagged for review.
+import {
+  RUN_START_SPEED_MPS, RUN_BASE_SPEED_MPS, RUN_RAMP_METRES, RUN_JUMP_HEIGHT,
+  runMaxSpeedMps,
+} from '@/lib/mini-games'
 
 //══════════ MiniGame 1: Chicken Run (endless runner) ══════════
 // 3 lanes · swipe/arrows to switch lanes · swipe up/space to jump
@@ -191,7 +200,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       s.time += dt
 
       // speed ramps with distance
-      s.speed = Math.min(24, 8 + s.distance / 140) * speedMult
+      s.speed = Math.min(RUN_BASE_SPEED_MPS, RUN_START_SPEED_MPS + s.distance / RUN_RAMP_METRES) * speedMult
       const dyPx = s.speed * PX_PER_M * dt
       s.distance += s.speed * dt
       if (s.invuln > 0) s.invuln -= dt
@@ -212,7 +221,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       // move entities + collisions
       const playerY = H - 86
       const px = LANES_X[0] * W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * W)
-      const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * 72 : 0
+      const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * RUN_JUMP_HEIGHT : 0
       const playerRect = { x: px - 19, y: playerY - 36 - jumpH, w: 38, h: 38 }
 
       for (const en of s.entities) {
@@ -222,7 +231,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
         if (en.kind === 'obstacle') {
           if (!en.hit && rectsOverlap(playerRect, { x: ex - 22, y: en.y - 20, w: 44, h: 44 })) {
             // jumpable if airborne & low obstacle
-            const cleared = jumpH > 26 && en.low
+            const cleared = jumpH > RUN_JUMP_HEIGHT * 0.36 && en.low
             if (!cleared && s.invuln <= 0) {
               en.hit = true
               s.lives -= 1
@@ -313,7 +322,7 @@ export function ChickenRun({ tier, tierName, speedMult, winTarget, onEnd, onQuit
       // player chicken
       const px2 = LANES_X[0] * W + s.laneAnim * ((LANES_X[1] - LANES_X[0]) * W)
       const playerY = H - 86
-      const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * 72 : 0
+      const jumpH = s.jumpT >= 0 ? Math.sin(s.jumpT * Math.PI) * RUN_JUMP_HEIGHT : 0
       const blink = s.invuln > 0 && Math.floor(s.time * 10) % 2 === 0
 
       // shadow
