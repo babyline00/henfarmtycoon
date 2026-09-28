@@ -1,9 +1,9 @@
 /**
  * Sound effects via Web Audio synthesis.
  *
- * Why synthesis rather than audio files: the game needs ~14 short cues
- * that fire dozens of times a minute. Shipping 14 clips means a ~300 KB
- * download, decode latency on first play, and licensing to clear if this
+ * Why synthesis rather than audio files: the game needs ~50 short cues
+ * that fire dozens of times a minute. Shipping 50 clips means megabytes
+ * of download, decode latency on first play, and licensing to clear if this
  * ever goes commercial. Procedural synthesis costs nothing to download,
  * has no licensing, works offline, and is deterministic per cue.
  *
@@ -22,9 +22,22 @@
  */
 
 export type SoundName =
+  // base UI / economy cues
   | 'click' | 'collect' | 'hatch' | 'buy' | 'sell' | 'error'
   | 'reward' | 'levelup' | 'coin' | 'notify' | 'feed' | 'jump'
   | 'crash' | 'win' | 'energy'
+  // game-specific: hen breeds (keys mirror HEN_TYPES)
+  | 'hen_normal' | 'hen_golden' | 'hen_royal' | 'hen_magic'
+  // game-specific: animals (keys mirror ANIMAL_TYPES + dragon reward)
+  | 'cow' | 'sheep' | 'duck' | 'dog' | 'cat' | 'horse' | 'dragon'
+  // game-specific: egg types (keys mirror EGG_TYPES)
+  | 'egg_crack' | 'egg_golden' | 'egg_royal' | 'egg_magic' | 'egg_diamond' | 'egg_mystery'
+  // game-specific: inventory items (keys mirror ITEM_TYPES)
+  | 'item_medicine' | 'item_vitamin' | 'item_feed' | 'item_growth'
+  | 'item_xp' | 'item_charm' | 'item_scarecrow' | 'item_sack'
+  // game-specific: farm / social / arcade moments
+  | 'build' | 'breed' | 'mission' | 'daily' | 'gift'
+  | 'powerup' | 'game_start' | 'game_over' | 'traffic' | 'splash'
 
 export interface SoundPrefs {
   enabled: boolean
@@ -103,6 +116,14 @@ const GAP_MS: Partial<Record<SoundName, number>> = {
   coin: 80,
   feed: 90,
   jump: 60,
+  // game-specific spam guards: coop taps, arcade loops, traffic ticks
+  hen_normal: 120, hen_golden: 120, hen_royal: 150, hen_magic: 150,
+  cow: 250, sheep: 250, duck: 200, dog: 180, cat: 220, horse: 250, dragon: 400,
+  egg_crack: 120, egg_golden: 150, egg_royal: 150, egg_magic: 150,
+  egg_diamond: 200, egg_mystery: 200,
+  item_medicine: 150, item_vitamin: 150, item_feed: 120, item_growth: 200,
+  item_xp: 150, item_charm: 200, item_scarecrow: 200, item_sack: 150,
+  traffic: 200, splash: 200, powerup: 150,
 }
 
 // ── engine ────────────────────────────────────────────────────
@@ -240,12 +261,58 @@ const VOICES: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
   crash:    c => { noise(c, out(c), { dur: 0.22, gain: 0.2, hp: 500 }); tone(c, out(c), { freq: 160, dur: 0.24, type: 'sawtooth', gain: 0.12, slideTo: 70 }) },
   win:      c => { [0, 4, 7, 12, 16, 19, 24].forEach((semi, i) => tone(c, out(c), { freq: 523.25 * Math.pow(2, semi / 12), dur: 0.26, type: 'triangle', gain: 0.2, delay: i * 0.08 })) },
   energy:   c => { tone(c, out(c), { freq: 300, dur: 0.1, type: 'sine', gain: 0.12, slideTo: 620 }) },
+  // ── hen breeds: same cluck shape, brighter base per rarity ──
+  hen_normal: c => { tone(c, out(c), { freq: 700, dur: 0.07, type: 'square', gain: 0.11 }); tone(c, out(c), { freq: 620, dur: 0.08, type: 'square', gain: 0.1, delay: 0.08 }) },
+  hen_golden: c => { tone(c, out(c), { freq: 990, dur: 0.07, type: 'square', gain: 0.1 }); tone(c, out(c), { freq: 1320, dur: 0.1, type: 'triangle', gain: 0.1, delay: 0.07 }) },
+  hen_royal:  c => { [523.25, 659.25, 783.99].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.1, type: 'triangle', gain: 0.14, delay: i * 0.06 })) },
+  hen_magic:  c => { tone(c, out(c), { freq: 400, dur: 0.28, type: 'sine', gain: 0.16, slideTo: 1200 }); tone(c, out(c), { freq: 1600, dur: 0.14, type: 'sine', gain: 0.08, delay: 0.2 }) },
+  // ── animals: cartoon approximations, one gesture each ──
+  cow:   c => { tone(c, out(c), { freq: 150, dur: 0.5, type: 'sawtooth', gain: 0.16, slideTo: 90 }) },
+  sheep: c => { tone(c, out(c), { freq: 380, dur: 0.16, type: 'square', gain: 0.11 }); tone(c, out(c), { freq: 360, dur: 0.16, type: 'square', gain: 0.1, delay: 0.14 }) },
+  duck:  c => { noise(c, out(c), { dur: 0.05, gain: 0.1, hp: 800 }); tone(c, out(c), { freq: 290, dur: 0.09, type: 'square', gain: 0.13 }); tone(c, out(c), { freq: 270, dur: 0.09, type: 'square', gain: 0.12, delay: 0.1 }) },
+  dog:   c => { noise(c, out(c), { dur: 0.06, gain: 0.14, hp: 900 }); tone(c, out(c), { freq: 360, dur: 0.09, type: 'square', gain: 0.14 }); tone(c, out(c), { freq: 340, dur: 0.09, type: 'square', gain: 0.13, delay: 0.11 }) },
+  cat:   c => { tone(c, out(c), { freq: 650, dur: 0.25, type: 'sine', gain: 0.15, slideTo: 950 }) },
+  horse: c => { tone(c, out(c), { freq: 720, dur: 0.4, type: 'sawtooth', gain: 0.11, slideTo: 300 }); noise(c, out(c), { dur: 0.18, gain: 0.08, hp: 600, delay: 0.05 }) },
+  dragon:c => { tone(c, out(c), { freq: 95, dur: 0.5, type: 'sawtooth', gain: 0.2, slideTo: 60 }); noise(c, out(c), { dur: 0.3, gain: 0.1, hp: 200, delay: 0.05 }); tone(c, out(c), { freq: 190, dur: 0.3, type: 'square', gain: 0.08, delay: 0.08 }) },
+  // ── eggs: crack first, then a rarity shimmer ──
+  egg_crack:  c => { noise(c, out(c), { dur: 0.12, gain: 0.18, hp: 2000 }); tone(c, out(c), { freq: 500, dur: 0.09, type: 'triangle', gain: 0.14, delay: 0.05 }) },
+  egg_golden: c => { noise(c, out(c), { dur: 0.1, gain: 0.15, hp: 2200 }); tone(c, out(c), { freq: 880, dur: 0.12, type: 'triangle', gain: 0.15, delay: 0.05 }); tone(c, out(c), { freq: 1174.66, dur: 0.16, type: 'triangle', gain: 0.13, delay: 0.12 }) },
+  egg_royal:  c => { noise(c, out(c), { dur: 0.1, gain: 0.15, hp: 2200 }); [523.25, 659.25].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.14, type: 'triangle', gain: 0.15, delay: 0.05 + i * 0.07 })) },
+  egg_magic:  c => { noise(c, out(c), { dur: 0.1, gain: 0.14, hp: 2200 }); tone(c, out(c), { freq: 500, dur: 0.3, type: 'sine', gain: 0.15, slideTo: 1500, delay: 0.05 }) },
+  egg_diamond:c => { noise(c, out(c), { dur: 0.08, gain: 0.14, hp: 4000 }); tone(c, out(c), { freq: 1567.98, dur: 0.14, type: 'sine', gain: 0.14, delay: 0.04 }); tone(c, out(c), { freq: 2093, dur: 0.2, type: 'sine', gain: 0.12, delay: 0.12 }) },
+  egg_mystery:c => { [392, 523.25, 659.25].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.12, type: 'triangle', gain: 0.14, delay: i * 0.08 })); tone(c, out(c), { freq: 1760, dur: 0.18, type: 'sine', gain: 0.1, delay: 0.26 }) },
+  // ── items: one gesture per tool ──
+  item_medicine: c => { noise(c, out(c), { dur: 0.15, gain: 0.12, hp: 3000 }); tone(c, out(c), { freq: 700, dur: 0.08, type: 'sine', gain: 0.1, delay: 0.1 }) },
+  item_vitamin:  c => { tone(c, out(c), { freq: 500, dur: 0.08, type: 'triangle', gain: 0.14 }); tone(c, out(c), { freq: 750, dur: 0.1, type: 'triangle', gain: 0.13, delay: 0.07 }) },
+  item_feed:     c => { noise(c, out(c), { dur: 0.08, gain: 0.13, hp: 600 }); noise(c, out(c), { dur: 0.08, gain: 0.12, hp: 600, delay: 0.1 }); tone(c, out(c), { freq: 240, dur: 0.1, type: 'triangle', gain: 0.1, delay: 0.05 }) },
+  item_growth:   c => { tone(c, out(c), { freq: 200, dur: 0.3, type: 'square', gain: 0.11, slideTo: 800 }) },
+  item_xp:       c => { [660, 880, 1108.73, 1318.51].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.09, type: 'sine', gain: 0.12, delay: i * 0.05 })) },
+  item_charm:    c => { tone(c, out(c), { freq: 1318.51, dur: 0.14, type: 'sine', gain: 0.13 }); tone(c, out(c), { freq: 1760, dur: 0.2, type: 'sine', gain: 0.11, delay: 0.1 }) },
+  item_scarecrow:c => { tone(c, out(c), { freq: 200, dur: 0.08, type: 'square', gain: 0.14 }); tone(c, out(c), { freq: 180, dur: 0.08, type: 'square', gain: 0.13, delay: 0.1 }); noise(c, out(c), { dur: 0.06, gain: 0.08, hp: 400 }) },
+  item_sack:     c => { tone(c, out(c), { freq: 150, dur: 0.14, type: 'sine', gain: 0.16 }); noise(c, out(c), { dur: 0.08, gain: 0.08, hp: 500, delay: 0.03 }) },
+  // ── farm / social / arcade moments ──
+  build:     c => { noise(c, out(c), { dur: 0.07, gain: 0.15, hp: 700 }); noise(c, out(c), { dur: 0.07, gain: 0.14, hp: 700, delay: 0.12 }); tone(c, out(c), { freq: 523.25, dur: 0.16, type: 'triangle', gain: 0.15, delay: 0.22 }) },
+  breed:     c => { tone(c, out(c), { freq: 659.25, dur: 0.14, type: 'sine', gain: 0.14 }); tone(c, out(c), { freq: 880, dur: 0.18, type: 'sine', gain: 0.13, delay: 0.11 }) },
+  mission:   c => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.13, type: 'triangle', gain: 0.15, delay: i * 0.06 })) },
+  daily:     c => { tone(c, out(c), { freq: 587.33, dur: 0.12, type: 'sine', gain: 0.14 }); tone(c, out(c), { freq: 880, dur: 0.18, type: 'sine', gain: 0.13, delay: 0.1 }) },
+  gift:      c => { [523.25, 659.25, 783.99].forEach((f, i) => tone(c, out(c), { freq: f, dur: 0.15, type: 'sine', gain: 0.14, delay: i * 0.07 })) },
+  powerup:   c => { tone(c, out(c), { freq: 300, dur: 0.22, type: 'square', gain: 0.11, slideTo: 900 }) },
+  game_start:c => { tone(c, out(c), { freq: 440, dur: 0.1, type: 'square', gain: 0.12 }); tone(c, out(c), { freq: 440, dur: 0.1, type: 'square', gain: 0.12, delay: 0.12 }); tone(c, out(c), { freq: 880, dur: 0.2, type: 'square', gain: 0.13, delay: 0.24 }) },
+  game_over: c => { tone(c, out(c), { freq: 400, dur: 0.2, type: 'triangle', gain: 0.14, slideTo: 200 }) },
+  traffic:   c => { tone(c, out(c), { freq: 350, dur: 0.12, type: 'square', gain: 0.1 }); tone(c, out(c), { freq: 330, dur: 0.12, type: 'square', gain: 0.1, delay: 0.13 }) },
+  splash:    c => { noise(c, out(c), { dur: 0.18, gain: 0.13, hp: 1000 }); tone(c, out(c), { freq: 500, dur: 0.16, type: 'sine', gain: 0.1, slideTo: 220, delay: 0.04 }) },
 }
 
 function out(c: AudioContext): AudioNode {
   // Route to master when it exists, otherwise straight to destination so
   // the tone is still audible during the tiny window before master is set.
   return master ?? c.destination
+}
+
+/** True when a cue has a synth voice. Used by tests to prove the
+ *  game-sound maps can never reference a missing voice. */
+export function hasVoice(name: SoundName): boolean {
+  return name in VOICES
 }
 
 /** Play a cue. Never throws, never blocks, safe to call on every action. */
