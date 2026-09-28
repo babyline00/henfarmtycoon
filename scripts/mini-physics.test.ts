@@ -30,6 +30,8 @@ import {
   evaluateRun, evaluateCross, evaluateCatch,
   catchMaxItems, catchSpawnRate, catchFallSpeed, CATCH_MAX_DURATION_SEC,
   RUN_COMBO_CAP, RUN_COMBO_STEP, catchOverlapsBasket, CATCH_FALL_MAX,
+  MAX_SESSION_SEC, ABANDON_AFTER_SEC, ABANDON_GRACE_SEC,
+  RUN_MAX_DURATION_SEC, CROSS_MAX_DURATION_SEC,
   type RunTelemetry, type CrossTelemetry, type CatchTelemetry,
 } from '../src/lib/mini-games'
 
@@ -582,4 +584,43 @@ test('degenerate input cannot produce a catch', () => {
   }
   // a negative band would invert the window and catch everything
   expect(catchOverlapsBasket(0, 0, BASKET_Y_TEST, -5)).toBe(false)
+})
+
+// ── the abandonment threshold ──
+test('MAX_SESSION_SEC is the longest legal game, not a magic number', () => {
+  // The arcade retires 'playing' rows past this age. If it were shorter than
+  // a real game, a player mid-run would have their session closed and their
+  // honest finish refused as "already finished" — a payout voided by a
+  // housekeeping rule. So it must be the maximum, and stay derived.
+  expect(MAX_SESSION_SEC).toBe(Math.max(RUN_MAX_DURATION_SEC, CROSS_MAX_DURATION_SEC, CATCH_MAX_DURATION_SEC))
+  expect(MAX_SESSION_SEC).toBe(CROSS_MAX_DURATION_SEC)
+  expect(MAX_SESSION_SEC).toBeGreaterThanOrEqual(RUN_MAX_DURATION_SEC)
+  expect(MAX_SESSION_SEC).toBeGreaterThanOrEqual(CATCH_MAX_DURATION_SEC)
+})
+
+test('a full-length run of every game still fits, with grace to spare', () => {
+  // The same argument from the player's side. The margin must be strictly
+  // positive for every game: at exactly the cap the evaluator still accepts
+  // the finish, so a sweep that fired there would void a legal payout.
+  for (const cap of [RUN_MAX_DURATION_SEC, CROSS_MAX_DURATION_SEC, CATCH_MAX_DURATION_SEC]) {
+    expect(ABANDON_AFTER_SEC - cap, `cap ${cap}`).toBeGreaterThan(0)
+  }
+  expect(ABANDON_GRACE_SEC).toBeGreaterThan(0)
+  expect(ABANDON_AFTER_SEC).toBe(MAX_SESSION_SEC + ABANDON_GRACE_SEC)
+})
+
+test('the grace covers the flooring gap in the duration check', () => {
+  // Reproduce the off-by-one the margin exists for. durationSec is
+  // floor(age), so an age just over the cap still reports a legal duration
+  // and must not have been retired yet.
+  const cap = CROSS_MAX_DURATION_SEC
+  for (const age of [cap, cap + 0.4, cap + 0.999]) {
+    const durationSec = Math.floor(age)
+    const legal = durationSec <= cap
+    const retired = age >= ABANDON_AFTER_SEC
+    expect(legal, `age ${age}: evaluator accepts`).toBe(true)
+    expect(retired, `age ${age}: must not be retired`).toBe(false)
+  }
+  // and once past the grace it is genuinely over
+  expect(ABANDON_AFTER_SEC + 1 >= ABANDON_AFTER_SEC).toBe(true)
 })

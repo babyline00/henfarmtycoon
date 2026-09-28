@@ -267,6 +267,36 @@ export function catchMaxItems(durationSec: number): number {
 const SPEED_HEADROOM = 1.15
 const ROW_HEADROOM = 2
 
+/**
+ * The longest any game session may legitimately last, in seconds.
+ *
+ * Derived rather than hard-coded so retuning a single game's cap cannot leave
+ * the abandoned-session sweep expiring runs that are still legal. It is the
+ * threshold past which a 'playing' session is provably over: the server would
+ * reject a finish for exceeding the cap, so no honest client could still be
+ * holding one open.
+ */
+export const MAX_SESSION_SEC = Math.max(
+  RUN_MAX_DURATION_SEC,
+  CROSS_MAX_DURATION_SEC,
+  CATCH_MAX_DURATION_SEC,
+)
+
+/**
+ * Grace added before a session is treated as abandoned.
+ *
+ * Without it the sweep and the evaluator disagree by a rounding step. The
+ * evaluator accepts a finish while `duration <= cap`, but duration is
+ * `floor(age)`, so a session aged 600.4s on a 600s cap still reports a legal
+ * 600 — and retiring it at exactly 600s would refuse an honest payout that
+ * the rules say is valid. The margin covers the gap plus the network round
+ * trip of the final finish call, so housekeeping can never void a legal run.
+ */
+export const ABANDON_GRACE_SEC = 30
+
+/** Age past which a 'playing' session can no longer legitimately be finished. */
+export const ABANDON_AFTER_SEC = MAX_SESSION_SEC + ABANDON_GRACE_SEC
+
 export function speedMultOf(tier: number): number {
   return GAME_TIERS[Math.min(Math.max(0, tier), GAME_TIERS.length - 1)]?.speedMult ?? 1
 }

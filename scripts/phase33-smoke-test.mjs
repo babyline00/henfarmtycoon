@@ -200,6 +200,26 @@ async function main() {
   const gs = await req('/api/game/state', { token })
   check('game state 200', gs.status === 200)
 
+  // ── abandoned-session sweep must not eat a live session ──
+  // The arcade retires 'playing' rows older than the longest legal game,
+  // because a client that walked away can never finish one. The failure mode
+  // that would matter is the opposite: retiring a run the player is in the
+  // middle of, which would make the eventual finish fail as "already
+  // finished" and void an honest payout.
+  const liveStart = await req('/api/mini', { method: 'POST', body: { action: 'start', gameKey: 'chicken_run' }, token })
+  const liveSid = liveStart.data.sessionId
+  check('live session started for sweep test', liveStart.status === 200 && !!liveSid)
+  // Wait long enough that a 120m run is plausible (a tier-0 run may cover
+  // ~27 m/s) but nowhere near the abandonment threshold.
+  await new Promise(r => setTimeout(r, 6000))
+  for (let i = 0; i < 3; i++) await req('/api/mini', { token })          // hub loads
+  const liveFinish = await req('/api/mini', { method: 'POST', body: { action: 'finish', sessionId: liveSid, distance: 120, coins: 2, eggs: 0, gems: 0, boxes: 0 }, token })
+  check('a fresh session survives hub loads and still pays out', liveFinish.status === 200 && !liveFinish.data.rejected && liveFinish.data.coins > 0, JSON.stringify(liveFinish.data).slice(0, 200))
+
+  // A finished session must not be resurrected or double-paid.
+  const replay = await req('/api/mini', { method: 'POST', body: { action: 'finish', sessionId: liveSid, distance: 900, coins: 20, eggs: 2, gems: 0, boxes: 0 }, token })
+  check('re-finishing the same session is refused', replay.status === 400 && (replay.data.error ?? '').includes('already finished'), JSON.stringify(replay.data))
+
   // ── cleanup: clear the flag the intentional cheat test just placed ──
   const users = await req(`/api/admin/users?q=${uname}`, { token: adminToken })
   const player = users.data.users?.find(u => u.username === uname)

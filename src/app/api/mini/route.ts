@@ -4,6 +4,7 @@ import { getConfig, adjustBalance, addXp, bumpMission, bumpDailyStat, notify } f
 import {
   computeEnergy, MINI_GAME_DEFS, GAME_TIERS, SEASON_REWARDS,
   tierForLevel, evaluateRun, evaluateCross, evaluateCatch, rollMysteryItem, winTargetFor,
+  ABANDON_AFTER_SEC,
 } from '@/lib/mini-games'
 import { ITEM_TYPES, numericLevel } from '@/lib/game'
 import { checkRate, logSecurityEvent, flagUser } from '@/lib/security'
@@ -100,6 +101,30 @@ export async function GET(req: Request) {
       take: 8,
     }),
   ])
+
+  // ── retire abandoned sessions ──
+  // A session is created as 'playing' and only ever closed by a `finish` from
+  // the client that opened it. If that client walks away — Quit button, closed
+  // tab, crash, lost connection — there is nobody left to report, and the row
+  // sat at 'playing' forever. It grew without bound and showed up in the
+  // admin's recent list as a game still in progress, which is not something
+  // it can ever be: a finish later than the game's cap is rejected outright.
+  //
+  // Past ABANDON_AFTER_SEC that is guaranteed, so the row is closed here on
+  // the player's next visit to the arcade. That threshold carries a grace
+  // margin over the longest legal game on purpose — see ABANDON_GRACE_SEC.
+  //
+  // Deliberately NO energy refund. A refund would be trivially farmable —
+  // start a game, close the tab, reopen, repeat — and the energy is the
+  // intended price of pressing Play.
+  await db.gameSession.updateMany({
+    where: {
+      userId: user.id,
+      result: 'playing',
+      createdAt: { lt: new Date(now.getTime() - ABANDON_AFTER_SEC * 1000) },
+    },
+    data: { result: 'abandoned', duration: ABANDON_AFTER_SEC },
+  })
 
   // sync stored energy forward so the UI (and start) see fresh values
   if (energy.energy !== user.gameEnergy) {

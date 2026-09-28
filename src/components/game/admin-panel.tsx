@@ -176,6 +176,22 @@ const GAME_LABELS: Record<string, string> = {
   egg_catch: '🥚 Egg Catch',
 }
 
+/**
+ * What a game's `score` column actually counts, with its unit.
+ *
+ * It is not the same number for every game: the runner stores metres, the
+ * crosser stores roads, and the catcher stores eggs — the catcher reports
+ * its eggs as the score precisely because it has no distance. Rendering
+ * every non-runner as "N roads" therefore told admins an Egg Catch session
+ * was a crossing, which is the sort of wrong-but-plausible reading that
+ * makes an admin mistrust the whole panel.
+ */
+const GAME_SCORE_UNIT: Record<string, { key: 'score' | 'distance'; unit: string }> = {
+  chicken_run: { key: 'distance', unit: 'm' },
+  road_crossing: { key: 'score', unit: 'roads' },
+  egg_catch: { key: 'score', unit: 'eggs' },
+}
+
 const PIE_COLORS = ['#16a34a', '#eab308', '#f97316', '#ec4899', '#14b8a6', '#a855f7', '#84cc16', '#ef4444']
 
 const failMessage = (e: unknown, what: string) =>
@@ -1338,7 +1354,12 @@ export function AdminPanel() {
                   <div key={s.id} className="flex items-center gap-2 rounded-lg bg-stone-50 px-2 py-1.5 text-[10px]">
                     <span aria-hidden="true">{s.avatar}</span>
                     <span className="flex-1 truncate font-bold text-stone-600">@{s.username}</span>
-                    <span className="text-stone-600">{s.gameKey === 'chicken_run' ? `${s.distance}m` : `${s.score} roads`}</span>
+                    <span className="text-stone-600">
+                      {(() => {
+                        const m = GAME_SCORE_UNIT[s.gameKey] ?? { key: 'score' as const, unit: '' }
+                        return `${m.key === 'distance' ? s.distance : s.score}${m.unit ? ` ${m.unit}` : ''}`
+                      })()}
+                    </span>
                     <span className="font-bold text-amber-700">🪙{s.coins}</span>
                     <span className={cn(
                       'rounded px-1 text-[8px] font-black uppercase',
